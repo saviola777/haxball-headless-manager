@@ -213,7 +213,7 @@ module.exports = class PluginManager {
    */
   _enablePluginAndDependencies(pluginId) {
     let dependenciesEnabled = false;
-    for (let dependency in
+    for (let dependency of
         this.getPluginById(pluginId).getPluginSpec().dependencies || {}) {
         dependenciesEnabled = dependenciesEnabled
             || this._enablePluginAndDependencies(this.getPluginId(dependency));
