@@ -1,0 +1,29 @@
+{
+  "name": "@saviola777/haxball-headless-manager",
+  "version": "0.7.0-git",
+  "description": "Plugin manager for headless HaxBall hosts.",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saviola777/haxball-headless-manager.git"
+  },
+  "keywords": [
+    "HaxBall",
+    "headless",
+    "plugin"
+  ],
+  "author": "Johannes Rückert",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/saviola777/haxball-headless-manager/issues"
+  },
+  "homepage": "https://github.com/saviola777/haxball-headless-manager#readme",
+  "dependencies": {
+    "@haxroomie/RoomTrapper": "^1.1.0",
+    "@natlibfi/loglevel-message-prefix": "^3.0.1",
+    "collections": "^5.1.2",
+    "jquery-browserify": "^1.8.1",
+    "loglevel": "^1.6.1",
+    "toposort": "^2.0.2"
+  }
+}
