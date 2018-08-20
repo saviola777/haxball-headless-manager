@@ -30,7 +30,7 @@ module.exports.createRoom = function(room, pluginManager) {
       const hasPlugin = this.hasPlugin(pluginName);
 
       if (typeof pluginName === `undefined` || (create && !hasPlugin)) {
-        const id = Date.now();
+        const id = String(Date.now());
         room._plugins[id] = pluginManager.roomTrapper.createTrappedRoom(room, id);
         room._plugins[id]._id = id;
         room._plugins[id]._accessed = false;

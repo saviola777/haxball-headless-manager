@@ -33,14 +33,19 @@ HHM.config.postInit = (HBInit) => {
   room.setScoreLimit(0);
   room.setTimeLimit(7);
 
-  room.onCommandAdmin1 = (player, arguments) => {
-    // Write !admin somepw to get admin in the room, make sure to change this
-    if (arguments[0] === 'somepw') {
+  // Don't print any !admin commands
+  room.onCommand_admin = (player, arguments) => {
+    return false;
+  };
+
+  // Write !admin somepw to get admin in the room, make sure to change this
+  room.onCommand_admin_somepw = (player, arguments) => {
+    if (arguments.length === 0) {
       room.setPlayerAdmin(player.id, true);
     }
 
     return false;
-  }
+  };
 };
 
 /**
@@ -84,13 +89,17 @@ HHM.config.repositories = [
   {
     url: `https://haxplugins.tk/plugins/`,
   },
+  {
+    url: `https://haxplugins.tk/testing/plugins/`,
+  },
 ];
 
 /**
  * Set this to true to check the HHM config without creating a room.
  *
  * Dependency resolution and execution order will be determined without the need
- * for a real room object.
+ * for a real room object. May not work for plugins that require the room to be
+ * up at load time.
  *
  * @type {boolean}
  */

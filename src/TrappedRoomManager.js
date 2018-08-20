@@ -100,11 +100,6 @@ module.exports = class TrappedRoomManager {
       for (let pluginId of Object.getOwnPropertyNames(this.room._plugins)) {
         this._provideHandlerObjectForIdentifier(pluginId);
 
-        // Skip disabled plugins
-        if (!this.room._pluginManager.isPluginEnabled(pluginId)) {
-          continue;
-        }
-
         if (this.handlers[pluginId].hasOwnProperty(handlerName)) {
           pluginIds.push(pluginId);
         }

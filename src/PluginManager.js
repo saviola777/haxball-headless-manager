@@ -28,16 +28,16 @@ module.exports = class PluginManager {
    * Adds a given plugin dependent to the depencencies of the given plugin
    * pluginName.
    *
-   * This means that the plugin pluginName depends on the plugin dependent.
+   * This means that the plugin pluginId depends on the plugin dependentName.
    */
-  _addDependent(pluginName, dependent) {
-    if (!this.dependencies.hasOwnProperty(dependent)) {
-      this.dependencies[dependent] = [];
+  _addDependent(pluginId, dependentName) {
+    if (!this.dependencies.hasOwnProperty(dependentName)) {
+      this.dependencies[dependentName] = [];
     }
 
     // Do not add duplicates
-    if ($.inArray(pluginName, this.dependencies[dependent]) === -1) {
-      this.dependencies[dependent].push(pluginName);
+    if ($.inArray(pluginId, this.dependencies[dependentName]) === -1) {
+      this.dependencies[dependentName].push(pluginId);
     }
   }
 
@@ -65,6 +65,8 @@ module.exports = class PluginManager {
     let dependencySuccess = true;
     let dependenciesAlreadyLoaded = [];
     for (let dependency of pluginSpec.dependencies) {
+      this._addDependent(pluginId, dependency);
+
       if (this.room.hasPlugin(dependency)) {
         dependenciesAlreadyLoaded.push(dependency);
         continue;
@@ -179,27 +181,29 @@ module.exports = class PluginManager {
    *
    * Strictly for logging purposes.
    */
-  _createDependencyChain(dependency, alreadyInChain) {
-    const dependencies = this.dependencies;
-
-    if (dependency in alreadyInChain) {
+  _createDependencyChain(dependencyId, alreadyInChain) {
+    if (dependencyId in alreadyInChain) {
       return ``;
     }
 
+    let dependencyName = this.getPluginName(dependencyId);
+
     let result = ``;
-    const disabled =  !this.isPluginEnabled(dependency);
+    const disabled =  !this.isPluginEnabled(dependencyId);
 
-    alreadyInChain.push(dependency);
+    alreadyInChain.push(dependencyId);
 
-    if (dependencies.hasOwnProperty(dependency)) {
-      result += `${dependency} required by ${this.dependencies[dependency]}`
-          + (disabled ? `(disabled)` : ``) + "\n";
-      for (let subDependency of dependencies[dependency]) {
+    if (this.dependencies.hasOwnProperty(dependencyName)) {
+      const dependents = this.dependencies[dependencyId].map(
+          (d) => this.getPluginName(d));
+      result += `${dependencyName} required by ${dependents}`
+          + (disabled ? `(disabled)` : ``) + ".\n";
+      for (let subDependency of this.dependencies[dependencyId]) {
         result += this._createDependencyChain(subDependency, alreadyInChain);
       }
     } else {
-      result += `${dependency} required by user config`
-          + (disabled ? `(disabled)` : ``) + "\n";
+      result += `${dependencyName} required by user config`
+          + (disabled ? `(disabled)` : ``) + ".\n";
     }
 
     return result;
@@ -214,7 +218,7 @@ module.exports = class PluginManager {
   _enablePluginAndDependencies(pluginId) {
     let dependenciesEnabled = false;
     for (let dependency of
-        this.getPluginById(pluginId).getPluginSpec().dependencies || {}) {
+        this.getPluginById(pluginId).getPluginSpec().dependencies || []) {
         dependenciesEnabled = dependenciesEnabled
             || this._enablePluginAndDependencies(this.getPluginId(dependency));
     }
@@ -240,8 +244,7 @@ module.exports = class PluginManager {
     }
 
     for (let dependingPlugin of this.dependencies[pluginName]) {
-      if (this.room._pluginsDisabled
-          .indexOf(this.getPluginId(dependingPlugin)) === -1) {
+      if (this.room._pluginsDisabled.indexOf(dependingPlugin) === -1) {
         return true;
       }
     }

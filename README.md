@@ -1,7 +1,7 @@
 # Haxball Headless Manager
 
 Suite of management scripts for headless haxball hosts, including plugins with
-dependency management.
+dependency management. [Changelog](./CHANGELOG.md). [License](./LICENSE).
 
 # Usage
 

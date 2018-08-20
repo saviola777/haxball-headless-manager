@@ -178,7 +178,7 @@ module.exports = class PluginLoader {
       let pluginUrl = repository.url + pluginName + repository.suffix;
 
       if (this.room.hasPlugin(pluginName)) {
-        return this.room.getPluginId(pluginName);
+        return this.room._pluginManager.getPluginId(pluginName);
       }
 
       HHM.log.debug(`Trying to load plugin: ${pluginUrl} from repository ${repository}`);

@@ -1,7 +1,7 @@
 "use strict";
 
 global.HHM = global.HHM || {};
-global.HHM.version = `0.7.0-git`;
+global.HHM.version = `0.7.1-git`;
 global.HHM.log = require(`./src/log`)().getLogger(`plugins`);
 global.$ = require(`jquery-browserify`);
 
