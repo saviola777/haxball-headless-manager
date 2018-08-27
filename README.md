@@ -74,9 +74,8 @@ would expect, parameters to this function are ignored.
 
 In addition to the native room API, the HHM provides the following functions:
 
-* `addRepository(url, prefix)`: Adds a new plugin repository. Useful if you want
-    to make sure your plugin dependencies can be loaded
-* `getPlugin(pluginName, create)`: Can be used to access the room objects of
+* `getManager()`: Returns the plugin manager, see below
+* `getPlugin(pluginName)`: Can be used to access the room objects of
     other plugins, making it possible to use their features
 * `getPluginConfig()`: Returns the configuration object of this plugin (i.e.
     `room.pluginSpec.config`)
@@ -84,13 +83,27 @@ In addition to the native room API, the HHM provides the following functions:
     `room.pluginSpec`)
 * `hasPlugin(pluginName)`: Returns whether a plugin with the given name is
     loaded and enabled
+* `getHandlerNames()`: Returns the handler names of this plugin
+* `getPropertyNames()`: Returns the property names of this plugin
 * `isEnabled()`: Returns whether this plugin is enabled
-* `getHandlerNames()`: Returns a list of all known handler names (of enabled
-    plugins)
 * `isStarted()`: Returns whether the room is up and running
 * `triggerEvent(event, ...args)`: Allows triggering events globally, use the
-    handler name without the `on`. Calling event handlers on the room instance
-    instead will only trigger the event handlers of your plugin
+    handler name without the `on` for the event. Calling event handlers on the
+    room instance instead will only trigger the event handlers of your plugin
+
+## HHM plugin manager functions
+
+* `addRepository(url, prefix)`: Adds a new plugin repository. Useful if you want
+    to make sure your plugin dependencies can be loaded
+* `getHandlerNames()`: Returns a list of all known handler names (of enabled
+    plugins)
+* `getPluginLoader()`: Returns the plugin loader
+* `getRoomManager()`: Returns the trapped room manager
+
+## Custom events
+
+* `onLoad`: Triggered once for each plugin after all of its dependencies have
+    been loaded
 
 ## The plugin specification
 
@@ -154,6 +167,15 @@ There are two major ways of interacting with other plugins:
     provided by that plugin and even modifying or extending that plugin (you
     should probably not do that)
 * Triggering events globally using `room.triggerEvent('PlayerChat', player, message)`
+
+
+## Interacting with the HHM system
+
+Serveral components for the HHM system are exposed globally:
+
+* `HHM.log`: HHM logger ([loglevel](https://github.com/pimterry/loglevel)),
+    which gives you a way to log to the dev console
+* `HHM.config`: Contains the HHM config as described above
 
 ## Publishing your plugins
 

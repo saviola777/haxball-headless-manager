@@ -1,3 +1,12 @@
+# Version 0.7.2
+
+- refactor room and plugin manager interfaces to be more intuitive and clear
+- add custom event `onLoad` to give plugins a way to execute code once
+    all dependencies have been loaded
+- add custom `room.sendChat` implementation that automatically cuts long
+    messages up to a maximum length defined in `HHM.config.sendChatMaxLength`
+- improve cron plugin, see its changelog
+
 # Version 0.7.1
 
 - improve commands plugin (see plugins/saviola/commands.js for changelog)

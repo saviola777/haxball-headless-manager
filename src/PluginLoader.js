@@ -87,7 +87,7 @@ module.exports = class PluginLoader {
       promise = await $.ajax({
         url: pluginUrl,
         dataType: `text`,
-        success: (pluginSource) => {
+        success: pluginSource => {
           const pluginRoom = that.room.getPlugin(pluginName, true);
 
           that._executePlugin(pluginSource, pluginRoom,

@@ -21,11 +21,12 @@ HHM.config.room = {
  *
  * Can be used to set initial room parameters or add custom event handlers.
  */
-HHM.config.postInit = (HBInit) => {
+HHM.config.postInit = HBInit => {
   let room = HBInit();
   room.pluginSpec = {
     dependencies: [
-      'saviola/commands',
+      `saviola/commands`,
+      `saviola/cron`,
     ]
   };
 
@@ -113,3 +114,12 @@ HHM.config.dryRun = false;
  * @type {boolean}
  */
 HHM.config.trueHeadless = false;
+
+/**
+ * Overlong messages are automatically split in the HHM sendChat
+ * implementation. To avoid (accidental) chat flooding, no message can be
+ * longer than this value.
+ *
+ * By default this limits the output to 20 lines.
+ */
+HHM.config.sendChatMaxLength = 2686;

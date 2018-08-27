@@ -42,58 +42,49 @@ module.exports = class PluginManager {
   }
 
   /**
-   * Checks whether the given plugin is loaded and loads its dependencies.
+   * Adds a plugin by name or by code, and returns an array, the last element
+   * of which is always the plugin ID or -1 if there was an error.
    *
-   * @return Promise<boolean> true if the plugin and all of its dependencies
-   * were loaded, false otherwise.
+   * Otherwise, the returned array contains executed onLoad functions (if
+   * loading the plugin was successful) and true for plugin which did not
+   * specify an onLoad function.
    */
-  async _addPlugin(pluginId) {
-    if (!this.pluginLoader._checkPluginLoaded(pluginId)
-        || !this._checkPluginsCompatible()) {
-      this._removePlugin(pluginId);
-      return false;
+  async _addPlugin(pluginName, pluginCode, onLoadStack) {
+    const executeOnLoadStack = typeof onLoadStack === `undefined`;
+    let pluginId = -1;
+
+    if (typeof pluginName !== `undefined`) {
+      pluginId = await this.pluginLoader.tryToLoadPluginByName(pluginName);
+    } else {
+      pluginId = this.pluginLoader.tryToLoadPluginByCode(pluginCode);
     }
 
-    const pluginRoom = this.getPluginById(pluginId);
+    onLoadStack = await this._checkPluginAndLoadDependencies(pluginId,
+        onLoadStack || []);
 
-    const pluginSpec = pluginRoom.getPluginSpec();
+    const success = onLoadStack.indexOf(false) === -1;
 
-    if (!pluginSpec.hasOwnProperty(`dependencies`)) {
-      return true;
-    }
+    if (success) {
+      pluginName = this.getPluginName(pluginId);
 
-    let dependencySuccess = true;
-    let dependenciesAlreadyLoaded = [];
-    for (let dependency of pluginSpec.dependencies) {
-      this._addDependent(pluginId, dependency);
+      // Merge user config
+      this._mergeConfig(pluginName, (HHM.config.plugins || {})[pluginName]);
 
-      if (this.room.hasPlugin(dependency)) {
-        dependenciesAlreadyLoaded.push(dependency);
-        continue;
+      if (executeOnLoadStack) {
+        onLoadStack.reverse().map(f => typeof f === `function` ? f() : false);
+
+        // TODO do we need to notify before this?
+        this.notifyAll();
       }
 
-      dependencySuccess = await this.addPluginByName(dependency)
-          && this._checkPluginsCompatible();
-
-      if (!dependencySuccess) {
-        break;
-      }
+      const name =
+          this.room._plugins[pluginId]._name || this.room._plugins[pluginId]._id;
+      HHM.log.info(`Plugin added successfully: ${name}`);
     }
 
-    // Remove plugin and its dependencies
-    if (!dependencySuccess) {
-      for (let dependency of pluginSpec.dependencies) {
-        if (dependenciesAlreadyLoaded.indexOf(dependency) === -1) {
-          this._removePlugin(this.getPluginId(dependency));
-        }
-      }
+    onLoadStack.push(pluginId);
 
-      this._removePlugin(pluginId);
-
-      return false;
-    }
-
-    return true;
+    return onLoadStack;
   }
 
   /**
@@ -142,6 +133,71 @@ module.exports = class PluginManager {
       HHM.log.error(this._createDependencyChain(dependency, []));
       throw configError;
     }
+  }
+
+  /**
+   * Checks whether the given plugin is loaded and loads its dependencies.
+   *
+   * @return Promise<Array> Array of functions to be executed after plugin load,
+   *  in reverse order. Boolean `true` indicates no function for that plugin,
+   *  boolean false indicates an error during plugin load, meaning all loaded
+   *  plugins will be removed and none of the functions in this array are
+   *  executed.
+   */
+  async _checkPluginAndLoadDependencies(pluginId, onLoadStack) {
+    if (!this.pluginLoader._checkPluginLoaded(pluginId)
+        || !this._checkPluginsCompatible()) {
+      this._removePlugin(pluginId);
+      onLoadStack.push(false);
+      return onLoadStack;
+    }
+
+    onLoadStack.push(this.getPluginById(pluginId).onLoad || true);
+
+    const pluginRoom = this.getPluginById(pluginId);
+
+    const pluginSpec = pluginRoom.getPluginSpec();
+
+    if (!pluginSpec.hasOwnProperty(`dependencies`)) {
+      // TODO the plugin might yet be unloaded, still execute onload?
+      // TODO build onLoad stack which is passed down and up again?
+      return onLoadStack;
+    }
+
+    let dependencySuccess = true;
+    let dependenciesAlreadyLoaded = [];
+    for (let dependency of pluginSpec.dependencies) {
+      this._addDependent(pluginId, dependency);
+
+      if (this.room.hasPlugin(dependency)) {
+        dependenciesAlreadyLoaded.push(dependency);
+        continue;
+      }
+
+      onLoadStack = await this._addPlugin(dependency, undefined, onLoadStack);
+
+      dependencySuccess = onLoadStack.indexOf(false) === -1
+          && this._checkPluginsCompatible();
+
+      if (!dependencySuccess) {
+        break;
+      }
+    }
+
+    // Remove plugin and its dependencies
+    if (!dependencySuccess) {
+      for (let dependency of pluginSpec.dependencies) {
+        if (dependenciesAlreadyLoaded.indexOf(dependency) === -1) {
+          this._removePlugin(this.getPluginId(dependency));
+        }
+      }
+
+      this._removePlugin(pluginId);
+
+      onLoadStack.push(false);
+    }
+
+    return onLoadStack;
   }
 
   /**
@@ -195,7 +251,7 @@ module.exports = class PluginManager {
 
     if (this.dependencies.hasOwnProperty(dependencyName)) {
       const dependents = this.dependencies[dependencyId].map(
-          (d) => this.getPluginName(d));
+          d => this.getPluginName(d));
       result += `${dependencyName} required by ${dependents}`
           + (disabled ? `(disabled)` : ``) + ".\n";
       for (let subDependency of this.dependencies[dependencyId]) {
@@ -252,10 +308,12 @@ module.exports = class PluginManager {
     return false;
   }
 
+  /**
+   * Loads the plugins defined in the user config.
+   */
   async _loadUserPlugins() {
     for (let pluginName of Object.getOwnPropertyNames(HHM.config.plugins || {})) {
       await this.addPluginByName(pluginName);
-      this._mergeConfig(pluginName, HHM.config.plugins[pluginName]);
 
       if (!this.room.hasPlugin(pluginName)) {
         HHM.log.error(`Unable to load user plugin: ${pluginName}`);
@@ -271,7 +329,7 @@ module.exports = class PluginManager {
    * Merges the given configuration into the configuration for the given plugin.
    */
   _mergeConfig(pluginName, config) {
-    if (!this.room.hasPlugin(pluginName)) {
+    if (!this.room.hasPlugin(pluginName) || typeof config === `undefined`) {
       return;
     }
 
@@ -322,19 +380,7 @@ module.exports = class PluginManager {
    * -1 otherwise.
    */
   async addPluginByName(pluginName) {
-    let pluginId = await this.pluginLoader.tryToLoadPluginByName(pluginName);
-
-    const result = await this._addPlugin(pluginId) ? pluginId : -1;
-
-    if (result > 0) {
-      const name =
-          this.room._plugins[result]._name || this.room._plugins[result]._id;
-      HHM.log.info(`Plugin added successfully: ${name}`);
-    }
-
-    this.notifyAll();
-
-    return result;
+    return (await this._addPlugin(pluginName)).pop();
   }
 
   /**
@@ -344,19 +390,14 @@ module.exports = class PluginManager {
    * -1 otherwise.
    */
   async addPluginByCode(pluginCode) {
-    let pluginId = this.pluginLoader.tryToLoadPluginByCode(pluginCode);
+    return (await this._addPlugin(undefined, pluginCode)).pop();
+  }
 
-    const result = await this._addPlugin(pluginId) ? pluginId : -1;
-
-    if (result > 0) {
-      const name =
-          this.room._plugins[result]._name || this.room._plugins[result]._id;
-      HHM.log.info(`Plugin added successfully: ${name}`);
-    }
-
-    this.notifyAll();
-
-    return result;
+  /**
+   * Adds a plugin repository.
+   */
+  addRepository(url, suffix) {
+    this.pluginLoader.addRepository(url, suffix);
   }
 
   /**
@@ -401,6 +442,40 @@ module.exports = class PluginManager {
   }
 
   /**
+   * Returns a list of plugin IDs for currently enabled plugins.
+   */
+  getEnabledPluginIds() {
+    return Object.getOwnPropertyNames(this.room._plugins)
+      .filter(id => this.isPluginEnabled(id));
+  }
+
+  /**
+   * Returns an array of all registered handler names.
+   */
+  getHandlerNames() {
+    if (typeof this.room._trappedRoomManager === `undefined`) {
+      return [];
+    }
+
+    let handlerNames = [];
+
+    for (let pluginId of
+        Object.getOwnPropertyNames(this.room._trappedRoomManager.handlers)) {
+      handlerNames = handlerNames.concat(Object.getOwnPropertyNames(
+          this.room._trappedRoomManager.handlers[pluginId]));
+    }
+
+    return [...new Set(handlerNames)];
+  }
+
+  /**
+   * Returns array of loaded plugin IDs.
+   */
+  getLoadedPluginIds() {
+    return Objects.getOwnPropertyNames(this.room._plugins);
+  }
+
+  /**
    * Returns the plugin for the given ID or undefined if no such plugin exists.
    */
   getPluginById(pluginId) {
@@ -415,6 +490,13 @@ module.exports = class PluginManager {
   }
 
   /**
+   * Returns the plugin loader of this plugin manager.
+   */
+  getPluginLoader() {
+    return this.pluginLoader;
+  }
+
+  /**
    * Returns the plugin name for the given ID or the ID if the plugin has no
    * associated name.
    */
@@ -425,6 +507,13 @@ module.exports = class PluginManager {
     }
 
     return pluginId;
+  }
+
+  /**
+   * Returns the trapped room manager.
+   */
+  getRoomManager() {
+    return this.room._trappedRoomManager;
   }
 
   /**
@@ -446,7 +535,7 @@ module.exports = class PluginManager {
    * Notifies all observers of changes.
    */
   notifyAll() {
-    this.observers.forEach((observer) => observer.update(this));
+    this.observers.forEach(observer => observer.update(this));
   }
 
   /**
@@ -489,7 +578,10 @@ module.exports = class PluginManager {
    * Changes can be e.g. plugins being added, enabled/disabled.
    */
   registerObserver(observer) {
-    this.observers.push(observer);
+    if (observer.hasOwnProperty(`update`)
+        && typeof observer.update === `function`) {
+      this.observers.push(observer);
+    }
   }
 
   /**

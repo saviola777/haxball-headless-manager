@@ -1,5 +1,7 @@
 /**
  * Plugin which adds HHM features to the Haxball room object.
+ *
+ * TODO add getManager, move non-specific functions to manager
  */
 
 const ui = require(`./ui/index`);
@@ -8,14 +10,26 @@ const ui = require(`./ui/index`);
  * Extends the given room with HHM features.
  */
 module.exports.createRoom = function(room, pluginManager) {
+  room.sendChatNative = room.sendChat || Function.prototype;
+
   return $.extend(room, {
     _plugins: {},
     _pluginsDisabled: [],
     _pluginIds: {},
     _pluginManager: pluginManager,
   }, {
-    addRepository: function(url, suffix) {
-      pluginManager.pluginLoader.addRepository(url, suffix);
+    /**
+     * Returns the handler names specific to this plugin.
+     */
+    getHandlerNames: function() {
+      return pluginManager.getRoomManager().getEventHandlerNames(room, this._id);
+    },
+
+    /**
+     * Returns the associated plugin manager.
+     */
+    getManager: function() {
+      return pluginManager;
     },
 
     /**
@@ -74,31 +88,19 @@ module.exports.createRoom = function(room, pluginManager) {
     },
 
     /**
+     * Returns the property names specific to this plugin.
+     */
+    getPropertyNames: function() {
+      return pluginManager.getRoomManager().getPropertyNames(room, this._id);
+    },
+
+    /**
      * Returns whether the given plugin is loaded and activated.
      */
     hasPlugin: function(pluginName) {
       return room._pluginIds.hasOwnProperty(pluginName)
           && room._pluginManager.isPluginEnabled(
               room._pluginManager.getPluginId(pluginName));
-    },
-
-    /**
-     * Returns an array of all registered handler names.
-     */
-    getHandlerNames: function() {
-      if (typeof room._trappedRoomManager === `undefined`) {
-        return [];
-      }
-
-      let handlerNames = [];
-
-      for (let pluginId of
-          Object.getOwnPropertyNames(room._trappedRoomManager.handlers)) {
-        handlerNames = handlerNames.concat(Object.getOwnPropertyNames(
-            room._trappedRoomManager.handlers[pluginId]));
-      }
-
-      return [...new Set(handlerNames)];
     },
 
     /**
@@ -114,6 +116,33 @@ module.exports.createRoom = function(room, pluginManager) {
      */
     isStarted: function() {
       return ui.isRoomLinkAvailable();
+    },
+
+    /**
+     * Splits overlong messages if necessary.
+     */
+    sendChat: function(message) {
+      if (message.length <= 140) {
+        return this.sendChatNative(message);
+      }
+
+      this.sendChatNative(`${message.substr(0, 137)}...`);
+
+      let index = 137;
+      let i = 1;
+
+      while (i * 140 < HHM.config.sendChatMaxLength) {
+        // TODO use message length for efficiency?
+        if (typeof message[index + 137] === `undefined`) {
+          return this.sendChatNative(`...${message.substr(index)}`);
+        }
+
+        this.sendChatNative(`...${message.substr(index, 134)}...`);
+        index += 134;
+        i++;
+      }
+
+      this.sendChatNative(`[Overlong message was cut off by flood protection]`);
     },
 
     /**

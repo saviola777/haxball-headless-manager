@@ -129,8 +129,8 @@ room.parseMessage = function(message, commandPrefix, separator) {
  * found.
  */
 function triggerEvents(player, parsedMessage) {
-  const eventHandlers = room.getHandlerNames()
-    .filter((handler) => handler.startsWith(`onCommand`));
+  const eventHandlers = room.getManager().getHandlerNames()
+    .filter(handler => handler.startsWith(`onCommand`));
 
   let subcommand = parsedMessage.command;
   const potentialSubcommands = [subcommand];
@@ -147,7 +147,7 @@ function triggerEvents(player, parsedMessage) {
   // Find the handler for the most specific subcommand
   for (let i = potentialSubcommands.length - 1; i >= 0; i--) {
     let subcommandEventHandlers = eventHandlers
-      .filter((handler) => handler.endsWith(potentialSubcommands[i]));
+      .filter(handler => handler.endsWith(potentialSubcommands[i]));
 
     // As soon as we have a match, trigger events and return
     if (subcommandEventHandlers.length > 0) {
@@ -157,7 +157,7 @@ function triggerEvents(player, parsedMessage) {
       let returnValue = true;
 
       returnValue = room.triggerEvent(
-          `Command${j + 1}_` + `${potentialSubcommands[i]}`, player, arguments,
+          `Command${j + 1}_${potentialSubcommands[i]}`, player, arguments,
           argumentString) !== false;
       returnValue = room.triggerEvent(`Command_${potentialSubcommands[i]}`,
           player, arguments, argumentString) !== false && returnValue;

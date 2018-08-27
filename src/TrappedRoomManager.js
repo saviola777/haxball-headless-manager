@@ -17,6 +17,7 @@ module.exports = class TrappedRoomManager {
     this.handlerExecutionOrders = {};
     this.handlersDirty = true;
 
+    this.observers = [];
     this.properties = {};
 
     this.room._trappedRoomManager = this;
@@ -142,6 +143,27 @@ module.exports = class TrappedRoomManager {
   }
 
   /**
+   * Returns the event handler names for the given plugin.
+   */
+  getEventHandlerNames(room, pluginId) {
+    this._provideHandlerObjectForIdentifier(pluginId);
+
+    return Object.getOwnPropertyNames(this.handlers[pluginId]);
+  }
+
+  /**
+   * Returns the properties (not event handlers) registered for the given
+   * plugin.
+   *
+   * To get both properties and event handlers, use Object.getOwnPropertyNames.
+   */
+  getPropertyNames(room, pluginId) {
+    this._providePropertyObjectForIdentifier(pluginId);
+
+    return Object.getOwnPropertyNames(this.properties[pluginId]);
+  }
+
+  /**
    * Returns whether the given there are handlers registered for the given
    * plugin ID.
    */
@@ -149,6 +171,26 @@ module.exports = class TrappedRoomManager {
     this._provideHandlerObjectForIdentifier(pluginId);
 
     return Object.getOwnPropertyNames(this.handlers[pluginId]).length > 0;
+  }
+
+  /**
+   * Returns whether there are properties registered for the given plugin ID.
+   *
+   * Note that global properties of the proxied room are NOT taken into account,
+   * as are properties starting with an underscore.
+   */
+  hasProperties(room, pluginId) {
+    this._providePropertyObjectForIdentifier(pluginId);
+
+    return Object.getOwnPropertyNames(this.properties[pluginId])
+    .filter(prop => !prop.startsWith('_')).length > 0;
+  }
+
+  /**
+   * Notifies all observers of changes.
+   */
+  notifyAll() {
+    this.observers.forEach(observer => observer.update(this));
   }
 
   /**
@@ -169,6 +211,33 @@ module.exports = class TrappedRoomManager {
     this._provideHandlerObjectForIdentifier(pluginId);
 
     return this.handlers[pluginId].hasOwnProperty(handler);
+  }
+
+  /**
+   * Registers the given callback function for the given handler and plugin ID.
+   */
+  onEventHandlerSet(room, handler, callback, pluginId) {
+    this._provideHandlerObjectForIdentifier(pluginId);
+    this.handlerNames.add(handler);
+
+    this.handlers[pluginId][handler] = callback;
+
+    this.handlersDirty = true;
+
+    this.notifyAll();
+  }
+
+  /**
+   * Removes the registered event handler for the given handler and plugin name.
+   */
+  onEventHandlerUnset(room, handler, pluginId) {
+    this._provideHandlerObjectForIdentifier(pluginId);
+
+    delete this.handlers[pluginId][handler];
+
+    this.handlersDirty = true;
+
+    this.notifyAll();
   }
 
   /**
@@ -197,15 +266,19 @@ module.exports = class TrappedRoomManager {
   /**
    * Returns an array of properties registered for the given plugin ID.
    *
+   * Properties are in the object properties in the JavaScript sense here:
+   * handler names are returned as well.
+   *
    * Note that global properties of the proxied room are taken into account as
    * well so long as they don't start with an underscore.
    */
   onOwnPropertyNamesGet(room, pluginId) {
     this._providePropertyObjectForIdentifier(pluginId);
+    this._provideHandlerObjectForIdentifier(pluginId);
 
     return [...new Set(Object.getOwnPropertyNames(room)
-    .filter((v) => !v.startsWith(`_`))
-    .concat(Object.getOwnPropertyNames(this.properties[pluginId])))];
+      .concat(Object.getOwnPropertyNames(this.properties[pluginId]))
+      .filter(v => !v.startsWith(`_`)))];
   }
 
   /**
@@ -236,29 +309,6 @@ module.exports = class TrappedRoomManager {
   }
 
   /**
-   * Registers the given callback function for the given handler and plugin ID.
-   */
-  onEventHandlerSet(room, handler, callback, pluginId) {
-    this._provideHandlerObjectForIdentifier(pluginId);
-    this.handlerNames.add(handler);
-
-    this.handlers[pluginId][handler] = callback;
-
-    this.handlersDirty = true;
-  }
-
-  /**
-   * Removes the registered event handler for the given handler and plugin name.
-   */
-  onEventHandlerUnset(room, handler, pluginId) {
-    this._provideHandlerObjectForIdentifier(pluginId);
-
-    delete this.handlers[pluginId][handler];
-
-    this.handlersDirty = true;
-  }
-
-  /**
    * Executes the event handlers registered for the given handler.
    *
    * @return boolean false if one of the event handlers returned false, true
@@ -283,19 +333,6 @@ module.exports = class TrappedRoomManager {
       }
     }
     return returnValue;
-  }
-
-  /**
-   * Returns whether there are properties registered for the given plugin ID.
-   *
-   * Note that global properties of the proxied room are NOT taken into account,
-   * as are properties starting with an underscore.
-   */
-  hasProperties(room, pluginId) {
-    this._providePropertyObjectForIdentifier(pluginId);
-
-    return Object.getOwnPropertyNames(this.properties[pluginId])
-      .filter((prop) => !prop.startsWith('_')).length > 0;
   }
 
   /**
@@ -335,6 +372,8 @@ module.exports = class TrappedRoomManager {
       this.properties[pluginId][`_name`] =
           this.properties[pluginId][property][`name`];
     }
+
+    this.notifyAll();
   }
 
   /**
@@ -344,6 +383,17 @@ module.exports = class TrappedRoomManager {
     this._providePropertyObjectForIdentifier(pluginId);
 
     delete this.properties[pluginId][property];
+
+    this.notifyAll();
+  }
+
+  /**
+   * Registers an observer which is notified when changes occur.
+   *
+   * Changes can be e.g. handlers / properties being set / unset.
+   */
+  registerObserver(observer) {
+    this.observers.push(observer);
   }
 
   /**
@@ -360,5 +410,7 @@ module.exports = class TrappedRoomManager {
     delete this.properties[pluginId];
     delete this.handlers[pluginId];
     this.handlersDirty = true;
+
+    this.notifyAll();
   }
 };
