@@ -85,6 +85,7 @@ module.exports = class PluginLoader {
 
     try {
       promise = await $.ajax({
+        crossDomain: true,
         url: pluginUrl,
         dataType: `text`,
         success: pluginSource => {
@@ -92,6 +93,8 @@ module.exports = class PluginLoader {
 
           that._executePlugin(pluginSource, pluginRoom,
               pluginName);
+
+          pluginName = pluginRoom._name;
 
           if (!that._checkPluginLoaded(pluginRoom._id)) {
             HHM.log.error(
@@ -107,8 +110,8 @@ module.exports = class PluginLoader {
       // Plugin not available from this repository, no action necessary
     }
 
-    return that.room.hasPlugin(pluginName) ?
-        that.room._pluginManager.getPluginId(pluginName) : -1;
+    return typeof pluginName !== `undefined` && that.room.hasPlugin(pluginName)
+        ? that.room._pluginManager.getPluginId(pluginName) : -1;
   }
 
   /**
@@ -172,22 +175,34 @@ module.exports = class PluginLoader {
    * @return the ID of the plugin or -1 if it couldn't be loaded.
    */
   async tryToLoadPluginByName(pluginName) {
-    let pluginId = -1;
-
     for (let repository of this.repositories) {
       let pluginUrl = repository.url + pluginName + repository.suffix;
+
+      HHM.log.debug(`Trying to load plugin: ${pluginUrl} from repository ${repository}`);
+
+      await this._loadPlugin(pluginUrl, pluginName);
 
       if (this.room.hasPlugin(pluginName)) {
         return this.room._pluginManager.getPluginId(pluginName);
       }
-
-      HHM.log.debug(`Trying to load plugin: ${pluginUrl} from repository ${repository}`);
-
-      pluginId = await this._loadPlugin(pluginUrl, pluginName);
     }
 
+    HHM.log.warn(`Unable to load plugin ${pluginName} from configured repositories`);
+
+    return -1;
+  }
+
+  async tryToLoadPluginByUrl(url, pluginName) {
+    let pluginId = -1;
+
+    if (typeof pluginName !== `undefined` && this.room.hasPlugin(pluginName)) {
+      return this.room._pluginManager.getPluginId(pluginName);
+    }
+
+    pluginId = this._loadPlugin(url, pluginName);
+
     if (pluginId === -1) {
-      HHM.log.warn(`Unable to load plugin ${pluginName} from configured repositories`);
+      HHM.log.warn(`Unable to load plugin from URL ${url}`);
     }
 
     return pluginId;

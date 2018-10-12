@@ -54,7 +54,7 @@ const configFormUrl = {
       view: `fieldset`, label: `Load from URL`, body: {
         rows: [
           { view: `text`, id: `hhm-config-url`, placeholder: `HHM config URL`,
-            value: `https://haxplugins.tk/config/default.js`},
+            value: HHM.defaultConfigUrl},
           { view: `button`, id: `hhm-config-submit-url`, type: `form`,
             label: `Load`, click: loadFromUrl },
         ]

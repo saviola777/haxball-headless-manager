@@ -64,6 +64,34 @@ module.exports = class TrappedRoomManager {
     }
   }
 
+  _executeHandler(handler, ...args) {
+    if (typeof handler === `function`) {
+      return handler(...args) !== false;
+    } else if (typeof handler !== `object`) {
+      // TODO support string handlers?
+      HHM.log.warn(`Invalid handler type: ${typeof handler}`);
+      return true;
+    }
+
+    let returnValue = true;
+
+    // Iterable
+    if (typeof handler[Symbol.iterator] === 'function') {
+      for (let h of handler) {
+        returnValue = this._executeHandler(h, ...args) && returnValue;
+      }
+
+      return returnValue;
+    }
+
+    // Object iteration
+    for (let h of Object.getOwnPropertyNames(handler)) {
+      returnValue = this._executeHandler(handler[h], ...args) && returnValue;
+    }
+
+    return returnValue;
+  }
+
   /**
    * Helper function to make sure there's a handler for each plugin ID.
    *
@@ -328,9 +356,8 @@ module.exports = class TrappedRoomManager {
         continue;
       }
 
-      if (this.handlers[pluginId][handler](...args) === false) {
-        returnValue = false;
-      }
+      returnValue = this._executeHandler(this.handlers[pluginId][handler],
+          ...args) !== false && returnValue;
     }
     return returnValue;
   }

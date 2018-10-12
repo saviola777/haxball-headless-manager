@@ -95,6 +95,13 @@ module.exports.createRoom = function(room, pluginManager) {
     },
 
     /**
+     * Returns whether this plugin has a name.
+     */
+    hasName: function() {
+      return this.hasOwnProperty(`_name`) && this._id !== this._name;
+    },
+
+    /**
      * Returns whether the given plugin is loaded and activated.
      */
     hasPlugin: function(pluginName) {
@@ -143,6 +150,14 @@ module.exports.createRoom = function(room, pluginManager) {
       }
 
       this.sendChatNative(`[Overlong message was cut off by flood protection]`);
+    },
+
+    /**
+     * Sets a new name for this plugin.
+     */
+    setName: function(name) {
+      this.pluginSpec = $.extend(this.pluginSpec, { name: name });
+      this.getManager().notifyAll();
     },
 
     /**

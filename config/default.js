@@ -1,3 +1,4 @@
+HHM = HHM || {};
 HHM.config = HHM.config || {};
 
 /**
@@ -23,30 +24,10 @@ HHM.config.room = {
  */
 HHM.config.postInit = HBInit => {
   let room = HBInit();
-  room.pluginSpec = {
-    dependencies: [
-      `saviola/commands`,
-      `saviola/cron`,
-    ]
-  };
 
   room.setDefaultStadium(`Big`);
   room.setScoreLimit(0);
   room.setTimeLimit(7);
-
-  // Don't print any !admin commands
-  room.onCommand_admin = (player, arguments) => {
-    return false;
-  };
-
-  // Write !admin somepw to get admin in the room, make sure to change this
-  room.onCommand_admin_somepw = (player, arguments) => {
-    if (arguments.length === 0) {
-      room.setPlayerAdmin(player.id, true);
-    }
-
-    return false;
-  };
 };
 
 /**
@@ -59,7 +40,14 @@ HHM.config.plugins = {
   'saviola/commands': {
     commandPrefix: `!`,
   },
-  'saviola/cron': {},
+  'saviola/roles': {
+    roles: {
+      'host': `otherpw`,
+      'admin': `somepw`,
+    },
+  },
+  'saviola/core': {},
+  'saviola/plugin-control': {},
 };
 
 /**
@@ -89,6 +77,9 @@ HHM.config.plugins = {
 HHM.config.repositories = [
   {
     url: `https://haxplugins.tk/plugins/`,
+  },
+  {
+    url: `http://quickswans.de/headless/manager/plugins/`,
   },
   {
     url: `https://haxplugins.tk/testing/plugins/`,
@@ -123,3 +114,10 @@ HHM.config.trueHeadless = false;
  * By default this limits the output to 20 lines.
  */
 HHM.config.sendChatMaxLength = 2686;
+
+// Load HHM if it has not already been loaded
+if (typeof HHM.manager === `undefined`) {
+  let s = document.createElement(`script`);
+  s.src="https://haxplugins.tk/hhm.js";
+  document.head.appendChild(s);
+}

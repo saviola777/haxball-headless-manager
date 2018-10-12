@@ -1,3 +1,12 @@
+# Version 0.7.3
+
+- add support for iterable (e.g. array) or object handlers
+- add [CORS Anywhere](https://github.com/Rob--W/cors-anywhere) proxy through
+    which all AJAX requests are automatically proxied (thanks
+    [morko](https://github.com/morko))
+- add `HHM.log.toRoom()`, which allows logging to both the room and the console
+- fix problem where plugins where sometimes loaded twice
+
 # Version 0.7.2
 
 - refactor room and plugin manager interfaces to be more intuitive and clear

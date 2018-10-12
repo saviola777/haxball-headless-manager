@@ -100,6 +100,33 @@ In addition to the native room API, the HHM provides the following functions:
 * `getPluginLoader()`: Returns the plugin loader
 * `getRoomManager()`: Returns the trapped room manager
 
+## Event handlers
+
+Event handlers can be defined as usual, using e.g.
+
+```javascript
+room.onPlayerChat = (player, message) => { … }
+```
+
+But for convenience it is also possible to use arrays (or objects) of handlers
+if you need several handlers for an event in your plugin (execution in order of
+definition):
+
+```javascript
+room.onPlayerChat = [
+    (player, message) => { /* handler #1 */ },
+    (player, message) => { /* handler #2 */ },
+];
+
+// or as an object, property names can be chosen freely
+room.onPlayerChat = {
+    handler1: (player, message) => { … },
+    handler2: (player, message) => { … },
+};
+```
+
+This also works recursively for nested arrays / objects.
+
 ## Custom events
 
 * `onLoad`: Triggered once for each plugin after all of its dependencies have
@@ -174,7 +201,8 @@ There are two major ways of interacting with other plugins:
 Serveral components for the HHM system are exposed globally:
 
 * `HHM.log`: HHM logger ([loglevel](https://github.com/pimterry/loglevel)),
-    which gives you a way to log to the dev console
+    which gives you a way to log to the dev console; if you want to log to both
+    the console and the room, you can use `HHM.log.toRoom()`.
 * `HHM.config`: Contains the HHM config as described above
 
 ## Publishing your plugins

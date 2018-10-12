@@ -51,16 +51,23 @@ module.exports = class PluginManager {
    */
   async _addPlugin(pluginName, pluginCode, onLoadStack) {
     const executeOnLoadStack = typeof onLoadStack === `undefined`;
+    onLoadStack = onLoadStack || [];
     let pluginId = -1;
 
     if (typeof pluginName !== `undefined`) {
+      // Avoid loading plugins twice
+      if (this.room.hasPlugin(pluginName)) {
+        onLoadStack.push(pluginId);
+        return onLoadStack;
+      }
+
       pluginId = await this.pluginLoader.tryToLoadPluginByName(pluginName);
     } else {
       pluginId = this.pluginLoader.tryToLoadPluginByCode(pluginCode);
     }
 
     onLoadStack = await this._checkPluginAndLoadDependencies(pluginId,
-        onLoadStack || []);
+        onLoadStack);
 
     const success = onLoadStack.indexOf(false) === -1;
 
@@ -348,11 +355,8 @@ module.exports = class PluginManager {
       } else {
         const postInitPlugin = this.room._plugins[postInitPluginId];
 
-        if (!postInitPlugin.hasOwnProperty(`_name`)) {
-          postInitPlugin.pluginSpec = $.extend(postInitPlugin.pluginSpec,
-              { name: `_postInit` });
-          // Update displayed name
-          this.notifyAll();
+        if (!postInitPlugin.hasName()) {
+          postInitPlugin.setName(`_postInit`);
         }
 
         HHM.log.info(`postInit code executed`);
@@ -384,10 +388,10 @@ module.exports = class PluginManager {
   }
 
   /**
-   * Loads the plugin from the given code and its dependencies.
+   * Loads the plugin and its dependencies from the given code.
    *
-   * @return Plugin ID if the plugin and all of its dependencies have been loaded,
-   * -1 otherwise.
+   * @return Plugin ID if the plugin and all of its dependencies have been
+   * loaded, -1 otherwise.
    */
   async addPluginByCode(pluginCode) {
     return (await this._addPlugin(undefined, pluginCode)).pop();
@@ -592,6 +596,8 @@ module.exports = class PluginManager {
    * aborted.
    */
   async start(room) {
+    HHM.log.setRoom(room);
+
     if (!config.isLoaded()) {
       HHM.log.error(`No configuration loaded`);
       return;

@@ -41,10 +41,18 @@
  *
  * - commandPrefix: Any line that starts with this is interpreted as a command.
  *    Defaults to `!`. Lines that only contain this command prefix are ignored.
+ * - multiCommandPrefixHidesMessage: If set to true, and lines that start with
+ *   two or more command prefixes (i.e. `!!`) are never displayed to the room,
+ *   but are otherwise treated like normal commands
  *
  * TODO add onCommand catch-all support
  *
  * Changelog:
+ *
+ * 1.2.0:
+ *  - add support for messages starting with multiple command prefixes to be
+ *    hidden always
+ *  - improve custom message parsing by providing an numArgsMax parameter
  *
  * 1.1.0:
  *  - add sub-command support
@@ -56,9 +64,10 @@ const room = HBInit();
 room.pluginSpec = {
   name: `saviola/commands`,
   author: `saviola`,
-  version: `1.1.0`,
+  version: `1.2.0`,
   config: {
     commandPrefix: `!`,
+    multiCommandPrefixHidesMessage: true,
   },
 };
 
@@ -66,10 +75,16 @@ room.pluginSpec = {
  * Triggers command events if a command was found in the incoming message.
  */
 room.onPlayerChat = function(player, message) {
+  message = room.getPluginConfig().commandPrefix !== ` `
+      ? message.trimStart() : message;
+
   const parsedMessage = room.parseMessage(message);
+  let returnValue = !room.getPluginConfig().multiCommandPrefixHidesMessage
+      || (message.length === removeMultiCommandPrefix(message,
+          room.getPluginConfig().commandPrefix).length);
 
   if (parsedMessage.command !== ``) {
-    return triggerEvents(player, parsedMessage)
+    return triggerEvents(player, parsedMessage) && returnValue;
   }
 
   return true;
@@ -82,11 +97,15 @@ room.onPlayerChat = function(player, message) {
  * @returns Object containing the command, and array of arguments, as well as
  *  a string containing all the arguments and the separator that was used.
  */
-room.parseMessage = function(message, commandPrefix, separator) {
-  message = message.trim();
+room.parseMessage = function(message, numArgsMax, commandPrefix, separator) {
+  if (typeof numArgsMax === `undefined`) {
+    numArgsMax = -2;
+  }
+
+  numArgsMax++;
 
   if (typeof commandPrefix === `undefined`) {
-    commandPrefix = room.pluginSpec.config.commandPrefix;
+    commandPrefix = room.getPluginConfig().commandPrefix;
   }
 
   if (typeof separator === `undefined`) {
@@ -102,7 +121,9 @@ room.parseMessage = function(message, commandPrefix, separator) {
     }
   }
 
-  const parts = message.split(separator).map(arg => arg.trim())
+  message = removeMultiCommandPrefix(message, commandPrefix);
+
+  const parts = message.split(separator, numArgsMax).map(arg => arg.trim())
     .filter(arg => arg.length > 0);
 
   const argumentString = parts.length > 1 ? message.split(separator, 2)[1] : ``;
@@ -119,6 +140,7 @@ room.parseMessage = function(message, commandPrefix, separator) {
     arguments: parts,
     argumentString: argumentString,
     separator: separator,
+    originalMessage: message,
   };
 };
 
@@ -143,7 +165,6 @@ function triggerEvents(player, parsedMessage) {
     potentialSubcommands.push(subcommand);
   }
 
-  let eventToBeTriggered;
   // Find the handler for the most specific subcommand
   for (let i = potentialSubcommands.length - 1; i >= 0; i--) {
     let subcommandEventHandlers = eventHandlers
@@ -157,12 +178,21 @@ function triggerEvents(player, parsedMessage) {
       let returnValue = true;
 
       returnValue = room.triggerEvent(
-          `Command${j + 1}_${potentialSubcommands[i]}`, player, arguments,
-          argumentString) !== false;
+          `Command${j}_${potentialSubcommands[i]}`, player, arguments,
+          argumentString, parsedMessage.originalMessage) !== false;
       returnValue = room.triggerEvent(`Command_${potentialSubcommands[i]}`,
-          player, arguments, argumentString) !== false && returnValue;
+          player, arguments, argumentString, parsedMessage.originalMessage)
+          !== false && returnValue;
 
       return returnValue;
     }
   }
+}
+
+function removeMultiCommandPrefix(message, commandPrefix) {
+  while (message.startsWith(commandPrefix + commandPrefix)) {
+    message = message.substr(commandPrefix.length);
+  }
+
+  return message;
 }

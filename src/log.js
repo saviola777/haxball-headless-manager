@@ -5,6 +5,9 @@
  *
  * To use the logger, simply call HHM.log.{info,warn,error,…}().
  *
+ * After the room was started, messages can be logged to the room using
+ * `HHM.log.toRoom(message, level)`.
+ *
  * @see https://github.com/pimterry/loglevel
  */
 module.exports = function Constructor() {
