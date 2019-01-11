@@ -105,7 +105,7 @@ function createOrShowAddPluginView() {
   const $$tabview = $$(`hhm-tabview`);
 
   // Create and/or attach view if necessary
-  if (typeof $$(`hhm-plugins-tab-new-plugin`) === `undefined`) {
+  if ($$(`hhm-plugins-tab-new-plugin`) === undefined) {
     $$tabview.addView({
       header: `New plugin`,
       body: { id: `hhm-plugins-tab-new-plugin`, rows: [
@@ -153,7 +153,7 @@ async function loadFromCode() {
  * Loads a plugin from the given code and name.
  */
 async function loadPlugin(code, name) {
-  if (typeof code === `undefined` || code === ``) {
+  if (code === undefined || code === ``) {
     alert(`Unable to load plugin: no or invalid plugin code provided`);
     return false;
   }
@@ -221,7 +221,7 @@ module.exports.updatePluginView = function() {
   $$table = $$(`hhm-plugins-tab-main-pluginTable`);
 
   // Do nothing if the plugin table doesn't exist yet
-  if (typeof $$table === `undefined`) {
+  if ($$table === undefined) {
     return;
   }
 

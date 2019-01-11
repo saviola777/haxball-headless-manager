@@ -1,4 +1,5 @@
-HHM = HHM || {};
+HHM = typeof HHM === `undefined` ? {} : HHM;
+HHM.baseUrl = HHM.baseUrl || `https://haxplugins.tk/testing/`;
 HHM.config = HHM.config || {};
 
 /**
@@ -9,7 +10,7 @@ HHM.config = HHM.config || {};
  */
 HHM.config.room = {
   roomName: `HHM room`,
-  playerName : `HHM`,
+  playerName : `:`,
   maxPlayers: 16,
   //password : `hhm`,
   public : false,
@@ -37,17 +38,18 @@ HHM.config.postInit = HBInit => {
  * If you leave this empty, you will have to load plugins through the UI.
  */
 HHM.config.plugins = {
-  'saviola/commands': {
+  'sav/commands': {
     commandPrefix: `!`,
   },
-  'saviola/roles': {
+  'sav/roles': {
     roles: {
       'host': `otherpw`,
       'admin': `somepw`,
     },
   },
-  'saviola/core': {},
-  'saviola/plugin-control': {},
+  'sav/plugin-control': {},
+  'sav/chat': {},
+  'sav/players': {},
 };
 
 /**
@@ -76,13 +78,10 @@ HHM.config.plugins = {
  */
 HHM.config.repositories = [
   {
-    url: `https://haxplugins.tk/plugins/`,
+    url: `${HHM.baseUrl}plugins/hhm-plugins/`,
   },
   {
-    url: `http://quickswans.de/headless/manager/plugins/`,
-  },
-  {
-    url: `https://haxplugins.tk/testing/plugins/`,
+    url: `${HHM.baseUrl}plugins/fm/`,
   },
 ];
 
@@ -116,8 +115,8 @@ HHM.config.trueHeadless = false;
 HHM.config.sendChatMaxLength = 2686;
 
 // Load HHM if it has not already been loaded
-if (typeof HHM.manager === `undefined`) {
+if (HHM.manager === undefined) {
   let s = document.createElement(`script`);
-  s.src="https://haxplugins.tk/hhm.js";
+  s.src = `${HHM.baseUrl}/hhm.js`;
   document.head.appendChild(s);
 }

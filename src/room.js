@@ -1,10 +1,8 @@
 /**
  * Plugin which adds HHM features to the Haxball room object.
  *
- * TODO add getManager, move non-specific functions to manager
+ * TODO move non-specific functions to manager
  */
-
-const ui = require(`./ui/index`);
 
 /**
  * Extends the given room with HHM features.
@@ -18,6 +16,51 @@ module.exports.createRoom = function(room, pluginManager) {
     _pluginIds: {},
     _pluginManager: pluginManager,
   }, {
+
+    /**
+     * Extends the global room object with an attribute or function.
+     *
+     * Please use very sparingly, this is primarily meant for workarounds or
+     * functions that should be part of the room API but aren't (yet).
+     *
+     * If you try to pass a non-function and the room already had an attribute
+     * with the same name, the extension will fail and false will be returned.
+     *
+     * The plugin room and previously defined function (if any) are passed as
+     * ...args arguments.
+     *
+     * @returns boolean true if the extension was successful, false if not
+     */
+    extend: function(name, element) {
+
+      if (typeof element !== `function` && room[name] === undefined) {
+        room[name] = element;
+        return true;
+      } else if (typeof element === `function`) {
+        const previousFn = room[name];
+
+        room[name] = function(...args) {
+          if (this.isEnabled()) {
+            return element({
+              previousFunction: previousFn,
+              callingPluginName: this._name,
+            }, ...args);
+          } else if (typeof previousFn === `function`) {
+            return previousFn(...args);
+          } else {
+            this.log(`Plugin ${this._name}, which provides function ${name}, `
+              + `is disabled, please make sure to properly declare dependencies `
+              + `and honor plugin states.`);
+            return () => {};
+          }
+        };
+
+        return true;
+      }
+
+      return false;
+    },
+
     /**
      * Returns the handler names specific to this plugin.
      */
@@ -28,7 +71,7 @@ module.exports.createRoom = function(room, pluginManager) {
     /**
      * Returns the associated plugin manager.
      */
-    getManager: function() {
+    getPluginManager: function() {
       return pluginManager;
     },
 
@@ -43,7 +86,7 @@ module.exports.createRoom = function(room, pluginManager) {
       let pluginRoom = {};
       const hasPlugin = this.hasPlugin(pluginName);
 
-      if (typeof pluginName === `undefined` || (create && !hasPlugin)) {
+      if (pluginName === undefined || (create && !hasPlugin)) {
         const id = String(Date.now());
         room._plugins[id] = pluginManager.roomTrapper.createTrappedRoom(room, id);
         room._plugins[id]._id = id;
@@ -98,6 +141,7 @@ module.exports.createRoom = function(room, pluginManager) {
      * Returns whether this plugin has a name.
      */
     hasName: function() {
+      // TODO use this._name !== undefined?
       return this.hasOwnProperty(`_name`) && this._id !== this._name;
     },
 
@@ -118,38 +162,13 @@ module.exports.createRoom = function(room, pluginManager) {
     },
 
     /**
-     * Returns false while waiting for the user to solve the captcha, true
-     * once a room link exists.
+     * TODO documentation
      */
-    isStarted: function() {
-      return ui.isRoomLinkAvailable();
-    },
-
-    /**
-     * Splits overlong messages if necessary.
-     */
-    sendChat: function(message) {
-      if (message.length <= 140) {
-        return this.sendChatNative(message);
+    log: function(message, level = HHM.log.level.INFO) {
+      level = HHM.log.hasOwnProperty(level) ? level : HHM.log.level.INFO;
+      if (HHM.log.hasOwnProperty(level)) {
+        HHM.log[level](`[${this._name}] ` + message);
       }
-
-      this.sendChatNative(`${message.substr(0, 137)}...`);
-
-      let index = 137;
-      let i = 1;
-
-      while (i * 140 < HHM.config.sendChatMaxLength) {
-        // TODO use message length for efficiency?
-        if (typeof message[index + 137] === `undefined`) {
-          return this.sendChatNative(`...${message.substr(index)}`);
-        }
-
-        this.sendChatNative(`...${message.substr(index, 134)}...`);
-        index += 134;
-        i++;
-      }
-
-      this.sendChatNative(`[Overlong message was cut off by flood protection]`);
     },
 
     /**
@@ -157,7 +176,7 @@ module.exports.createRoom = function(room, pluginManager) {
      */
     setName: function(name) {
       this.pluginSpec = $.extend(this.pluginSpec, { name: name });
-      this.getManager().notifyAll();
+      this.getPluginManager().notifyAll();
     },
 
     /**
@@ -168,6 +187,8 @@ module.exports.createRoom = function(room, pluginManager) {
      * handlers for the given event. As the event name, the event handler name
      * minus the "on" has to be specified, e.g. for "onSomeEvent" it should be
      * "SomeEvent".
+     *
+     * Can also be (ab)used to trigger native events.
      */
     triggerEvent: function(event, ...args) {
       const eventHandler = `on${event}`;

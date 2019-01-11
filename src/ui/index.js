@@ -71,7 +71,7 @@ function displayRoomLinkInHhmContainer() {
  */
 module.exports.initialize = function() {
   // If webix is not loaded then skip UI initialization
-  if (typeof webix === `undefined`) {
+  if (webix === undefined) {
     return;
   }
 

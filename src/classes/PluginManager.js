@@ -3,10 +3,9 @@
  */
 
 const $ = require(`jquery-browserify`);
-const config = require(`./ui/config`);
-const ui = require(`./ui/index`);
+const config = require(`../ui/config`);
+const ui = require(`../ui`);
 const PluginLoader = require(`./PluginLoader`);
-const EventHandlerManager = require(`./TrappedRoomManager`);
 const TrappedRoomManager = require(`./TrappedRoomManager`);
 const RoomTrapper = require(`@haxroomie/RoomTrapper`);
 const configError = new Error(`Invalid HHM configuration`);
@@ -20,6 +19,7 @@ const configError = new Error(`Invalid HHM configuration`);
 module.exports = class PluginManager {
 
   constructor() {
+    this._class = `PluginManager`;
     this.dependencies = {};
     this.observers = [];
   }
@@ -50,7 +50,7 @@ module.exports = class PluginManager {
    * specify an onLoad function.
    */
   async _addPlugin(pluginName, pluginCode, onLoadStack) {
-    const executeOnLoadStack = typeof onLoadStack === `undefined`;
+    const executeOnLoadStack = onLoadStack === undefined;
     onLoadStack = onLoadStack || [];
     let pluginId = -1;
 
@@ -257,6 +257,7 @@ module.exports = class PluginManager {
     alreadyInChain.push(dependencyId);
 
     if (this.dependencies.hasOwnProperty(dependencyName)) {
+      // TODO this.dependencies[dependencyId] can be null, debug
       const dependents = this.dependencies[dependencyId].map(
           d => this.getPluginName(d));
       result += `${dependencyName} required by ${dependents}`
@@ -316,6 +317,14 @@ module.exports = class PluginManager {
   }
 
   /**
+   * Loads the core plugin
+   */
+  _loadCorePlugin() {
+    return require(`../plugin`)
+      .initializeCorePlugin(this.room.getPlugin(`_core`, true));
+  }
+
+  /**
    * Loads the plugins defined in the user config.
    */
   async _loadUserPlugins() {
@@ -336,7 +345,7 @@ module.exports = class PluginManager {
    * Merges the given configuration into the configuration for the given plugin.
    */
   _mergeConfig(pluginName, config) {
-    if (!this.room.hasPlugin(pluginName) || typeof config === `undefined`) {
+    if (!this.room.hasPlugin(pluginName) || config === undefined) {
       return;
     }
 
@@ -457,7 +466,7 @@ module.exports = class PluginManager {
    * Returns an array of all registered handler names.
    */
   getHandlerNames() {
-    if (typeof this.room._trappedRoomManager === `undefined`) {
+    if (this.room._trappedRoomManager === undefined) {
       return [];
     }
 
@@ -558,7 +567,7 @@ module.exports = class PluginManager {
       return;
     }
 
-    if (typeof room === `undefined`) {
+    if (room === undefined) {
       if (HHM.config.dryRun) {
         HHM.log.info(`Creating fake room for dry run`);
         room = {};
@@ -573,7 +582,7 @@ module.exports = class PluginManager {
     }
 
     // TODO extract room code into other file?
-    return require(`./room`).createRoom(room, this);
+    return require(`../room`).createRoom(room, this);
   }
 
   /**
@@ -596,8 +605,6 @@ module.exports = class PluginManager {
    * aborted.
    */
   async start(room) {
-    HHM.log.setRoom(room);
-
     if (!config.isLoaded()) {
       HHM.log.error(`No configuration loaded`);
       return;
@@ -606,7 +613,7 @@ module.exports = class PluginManager {
     HHM.log.info(`HHM bootstrapping complete, config loaded`);
 
     // No room for now, abort
-    if (typeof room === `undefined`) {
+    if (room === undefined) {
       return;
     }
 
@@ -616,6 +623,8 @@ module.exports = class PluginManager {
 
     this.pluginLoader = new PluginLoader(this.room,
         HHM.config.repositories || []);
+
+    this._loadCorePlugin();
 
     if (!await this._loadUserPlugins()) {
       throw Error(`Error during HHM start`);

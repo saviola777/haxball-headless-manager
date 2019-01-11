@@ -16,6 +16,7 @@ const repositoryDefaults = {
 module.exports = class PluginLoader {
 
   constructor(room, repositories) {
+    this._class = `PluginLoader`;
     this.room = room;
 
     this._prepareRepositoryConfigurations(repositories);

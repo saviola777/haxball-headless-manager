@@ -251,7 +251,10 @@ module.exports.provideConfig = function() {
   } else {
     if (!HHM.config.trueHeadless) {
       util.loadScript(`https://cdn.webix.com/edge/webix.js`,
-          () => ui.initialize() && deferred.resolve());
+          () => {
+            ui.initialize();
+            deferred.resolve()
+          });
     } else {
       deferred.resolve();
     }
@@ -270,5 +273,5 @@ module.exports.provideConfig = function() {
  * @returns {boolean} Whether config has been loaded.
  */
 module.exports.isLoaded = function() {
-  return !(typeof HHM.config === `undefined`);
+  return !(HHM.config === undefined);
 };

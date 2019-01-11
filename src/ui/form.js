@@ -14,7 +14,7 @@ module.exports.loadFileContent = async function($$uploader) {
   const fileId = $$uploader.files.getFirstId();
 
   // No files uploaded, abort
-  if (typeof fileId === `undefined`) {
+  if (fileId === undefined) {
     //alert(`Please upload a file first`);
     return ``;
   }

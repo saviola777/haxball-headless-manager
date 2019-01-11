@@ -74,7 +74,7 @@ would expect, parameters to this function are ignored.
 
 In addition to the native room API, the HHM provides the following functions:
 
-* `getManager()`: Returns the plugin manager, see below
+* `getPluginManager()`: Returns the plugin manager, see below
 * `getPlugin(pluginName)`: Can be used to access the room objects of
     other plugins, making it possible to use their features
 * `getPluginConfig()`: Returns the configuration object of this plugin (i.e.
@@ -198,11 +198,12 @@ There are two major ways of interacting with other plugins:
 
 ## Interacting with the HHM system
 
-Serveral components for the HHM system are exposed globally:
+Several components for the HHM system are exposed globally:
 
 * `HHM.log`: HHM logger ([loglevel](https://github.com/pimterry/loglevel)),
-    which gives you a way to log to the dev console; if you want to log to both
-    the console and the room, you can use `HHM.log.toRoom()`.
+    which gives you a way to log to the dev console. In most cases, you should
+    use `room.log` though, which is a wrapper automatically adding the plugin
+    name.
 * `HHM.config`: Contains the HHM config as described above
 
 ## Publishing your plugins

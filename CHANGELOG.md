@@ -1,3 +1,17 @@
+# Version 0.8.0
+
+- add support for event state validators and pre-event handler hooks, which help
+    deal with problematic multi-handler situations
+- add room.log() function, which automatically adds the plugin name in log
+    messages
+- extra parameters (event handler execution metadata) are now passed more
+    smartly by analysing the expected parameters of an event handler using
+    reflection
+- add room extension mechanism which allows extending existing room function or
+    adding new ones using room.extend()
+- plugins have been moved to a [separate repository](https://github.com/saviola777/hhm-plugins)
+- refactoring!
+
 # Version 0.7.3
 
 - add support for iterable (e.g. array) or object handlers
