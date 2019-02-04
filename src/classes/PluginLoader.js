@@ -23,30 +23,12 @@ module.exports = class PluginLoader {
   }
 
   /**
-   * Returns whether the plugin with the given name has been loaded.
-   *
-   * A plugin has been loaded if it exists (i.e. an attempt has been made to
-   * load it) and it has made a call to HBInit().
-   *
-   * Plugins that do not interact with the headless room are not considered
-   * valid and will not be marked as loaded.
-   */
-  _checkPluginLoaded(pluginId) {
-    // Plugin doesn't exist
-    if (!this.room._pluginManager.hasPluginById(pluginId)) {
-      return false;
-    }
-
-    return this.room._pluginManager.getPluginById(pluginId)._accessed || false;
-  }
-
-  /**
    * Create and execute the plugin in a function context, passing a single
    * argument 'HBInit', which is a function returning the trapped room
    */
   _executePlugin(pluginSource, pluginRoom, pluginName) {
     const HBInit = () => {
-      pluginRoom._accessed = true;
+      pluginRoom._lifecycle.accessed = true;
       return pluginRoom;
     };
 
@@ -82,10 +64,9 @@ module.exports = class PluginLoader {
    */
   async _loadPlugin(pluginUrl, pluginName) {
     const that = this;
-    let promise = -1;
 
     try {
-      promise = await $.ajax({
+      await $.ajax({
         crossDomain: true,
         url: pluginUrl,
         dataType: `text`,
@@ -97,7 +78,7 @@ module.exports = class PluginLoader {
 
           pluginName = pluginRoom._name;
 
-          if (!that._checkPluginLoaded(pluginRoom._id)) {
+          if (!that.room._pluginManager.hasPluginById(pluginRoom._id)) {
             HHM.log.error(
                 `Repository did not return an error but plugin was not ` +
                 `loaded for plugin ${pluginName}`);

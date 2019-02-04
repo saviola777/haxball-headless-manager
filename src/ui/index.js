@@ -53,8 +53,7 @@ const hhmView = {
 /**
  * Displays the room link from the iframe in the room info tab.
  */
-function displayRoomLinkInHhmContainer() {
-  const roomLink = module.exports.getRoomLink();
+module.exports.displayRoomLinkInHhmContainer = function(roomLink) {
 
   $$(`hhm-tab-roomInfo`).addView({
     autoheight: true,
@@ -64,7 +63,7 @@ function displayRoomLinkInHhmContainer() {
       { view: `template`, template: `<a href="${roomLink}">${roomLink}</a>`}
     ]
   });
-}
+};
 
 /**
  * Initializes the UI by adding the HHM containers and the main tabview.
@@ -93,30 +92,6 @@ module.exports.setHhmConfigAndIframeVisibility = function(hhmVisible) {
     $(`#hhm-config-container`).addClass(`hidden`);
     $(`iframe`).removeClass(`hidden`);
   }
-};
-
-/**
- * Sets up an interval which checks each second if the captcha has been resolved
- * (which is, by definition, the case when the room link appears).
- *
- * TODO rename to waitForRoomLink or something?
- */
-module.exports.waitForCaptchaResolution = function() {
-  const deferred = new $.Deferred();
-
-  const interval = setInterval(function() {
-    if (module.exports.isRoomLinkAvailable()) {
-      clearInterval(interval);
-      deferred.resolve();
-      displayRoomLinkInHhmContainer();
-      $(`iframe`).addClass(`hidden`);
-      $(`#hhm-main-container`).removeClass(`hidden`);
-      $$(`hhm-tabview`).resize(true);
-      require(`./plugins`).updatePluginView();
-    }
-  }, 1000);
-
-  return deferred.promise();
 };
 
 /**

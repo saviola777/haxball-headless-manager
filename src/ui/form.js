@@ -3,10 +3,10 @@
  */
 
 /**
- * This function loads a single file from the given webix uploader and return
+ * This function loads a single file from the given webix uploader and returns
  * the plain text content.
  *
- * @return Plain text file content or `` if not file was uploaded.
+ * @return Plain text file content or `` if no file was uploaded.
  *
  * TODO distinguish between empty file and no file?
  */

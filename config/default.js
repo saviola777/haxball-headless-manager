@@ -1,5 +1,5 @@
 HHM = typeof HHM === `undefined` ? {} : HHM;
-HHM.baseUrl = HHM.baseUrl || `https://haxplugins.tk/testing/`;
+HHM.baseUrl = HHM.baseUrl || `https://haxplugins.tk/`;
 HHM.config = HHM.config || {};
 
 /**
@@ -26,9 +26,11 @@ HHM.config.room = {
 HHM.config.postInit = HBInit => {
   let room = HBInit();
 
-  room.setDefaultStadium(`Big`);
-  room.setScoreLimit(0);
-  room.setTimeLimit(7);
+  room.onRoomLink = () => {
+    room.setDefaultStadium(`Big`);
+    room.setScoreLimit(0);
+    room.setTimeLimit(7);
+  }
 };
 
 /**

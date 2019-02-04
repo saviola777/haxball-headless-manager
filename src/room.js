@@ -18,6 +18,44 @@ module.exports.createRoom = function(room, pluginManager) {
   }, {
 
     /**
+     * Add an event state validator function for the given handler name.
+     *
+     * @see TrappedRoomManager#addEventStateValidator
+     */
+    addEventStateValidator: function(handlerName, validator) {
+      this.getPluginManager().getRoomManager()
+          .addEventStateValidator(this._id, handlerName, validator);
+
+      return this;
+    },
+
+    /**
+     * Add a hook for the given handler name that is executed before plugin
+     * event handlers.
+     *
+     * @see TrappedRoomManager#addPreEventHandlerHook
+     */
+    addPreEventHandlerHook: function(handlerName, hook) {
+      this.getPluginManager().getRoomManager()
+          .addPreEventHandlerHook(this._id, handlerName, hook);
+
+      return this;
+    },
+
+    /**
+     * Add a hook for the given handler name that is executed after plugin
+     * event handlers.
+     *
+     * @see TrappedRoomManager#addPostEventHandlerHook
+     */
+    addPostEventHandlerHook: function(handlerName, hook) {
+      this.getPluginManager().getRoomManager()
+          .addPostEventHandlerHook(this._id, handlerName, hook);
+
+      return this;
+    },
+
+    /**
      * Extends the global room object with an attribute or function.
      *
      * Please use very sparingly, this is primarily meant for workarounds or
@@ -89,11 +127,12 @@ module.exports.createRoom = function(room, pluginManager) {
       if (pluginName === undefined || (create && !hasPlugin)) {
         const id = String(Date.now());
         room._plugins[id] = pluginManager.roomTrapper.createTrappedRoom(room, id);
-        room._plugins[id]._id = id;
-        room._plugins[id]._accessed = false;
+        room._plugins[id]._id = room._plugins[id]._name = id;
+        room._plugins[id]._lifecycle = { accessed: false, loaded: false };
+        room._pluginsDisabled.push(id);
         pluginRoom = room._plugins[id];
 
-        if (typeof pluginName !== `undefined`) {
+        if (pluginName !== undefined) {
           room._pluginIds[pluginName] = id;
           room._plugins[id]._name = pluginName;
         }
@@ -141,17 +180,25 @@ module.exports.createRoom = function(room, pluginManager) {
      * Returns whether this plugin has a name.
      */
     hasName: function() {
-      // TODO use this._name !== undefined?
-      return this.hasOwnProperty(`_name`) && this._id !== this._name;
+      return this._name !== undefined && this._id !== this._name;
     },
 
     /**
-     * Returns whether the given plugin is loaded and activated.
+     * Returns whether the given plugin is loaded.
      */
     hasPlugin: function(pluginName) {
-      return room._pluginIds.hasOwnProperty(pluginName)
-          && room._pluginManager.isPluginEnabled(
-              room._pluginManager.getPluginId(pluginName));
+      return room._pluginManager.hasPluginById(
+          room._pluginManager.getPluginId(pluginName));
+    },
+
+    /**
+     * Returns whether the function has been fully loaded.
+     *
+     * A plugin is loaded when all of its dependencies are loaded and its
+     * onLoad event handler (if it exists) has been executed.
+     */
+    isLoaded: function() {
+      return this._lifecycle.loaded || false;
     },
 
     /**
@@ -175,12 +222,11 @@ module.exports.createRoom = function(room, pluginManager) {
      * Sets a new name for this plugin.
      */
     setName: function(name) {
-      this.pluginSpec = $.extend(this.pluginSpec, { name: name });
-      this.getPluginManager().notifyAll();
+      this._name = name;
     },
 
     /**
-     * Triggers the given event with the given arguments.
+     * Triggers an event with the given name and arguments.
      *
      * Calling an event handler directly will only execute the current
      * plugin's event handler, while using this function will trigger all
@@ -190,8 +236,8 @@ module.exports.createRoom = function(room, pluginManager) {
      *
      * Can also be (ab)used to trigger native events.
      */
-    triggerEvent: function(event, ...args) {
-      const eventHandler = `on${event}`;
+    triggerEvent: function(eventName, ...args) {
+      const eventHandler = `on${eventName}`;
       if (room.hasOwnProperty(eventHandler)) {
         return room[eventHandler](...args);
       }

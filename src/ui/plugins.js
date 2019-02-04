@@ -1,6 +1,8 @@
 /**
  * UI modules which displays loaded plugins, allows plugins to be loaded and
  * disabled, and displays plugin-specific UIs.
+ *
+ * TODO move parts of the UI into regular HHM plugin
  */
 
 const form = require(`./form`);
@@ -231,7 +233,7 @@ module.exports.updatePluginView = function() {
 
   let name, author, version, buttonId, enabled;
   for (let id of Object.getOwnPropertyNames(plugins)) {
-    name = plugins[id]._name || plugins[id]._id;
+    name = plugins[id]._name;
     author = plugins[id].getPluginSpec().author || `n/a`;
     version = plugins[id].getPluginSpec().version || `n/a`;
     enabled = HHM.manager.isPluginEnabled(id);
@@ -267,6 +269,8 @@ module.exports.updatePluginView = function() {
  * Initialize the plugin view.
  */
 module.exports.initialize = function() {
+  $(`#hhm-main-container`).removeClass(`hidden`);
+
   $$(`hhm-tabview`).addView({
     header: `Plugins`,
     body: pluginsTabView,
@@ -274,7 +278,9 @@ module.exports.initialize = function() {
 
   ui.registerViewChangeHandler(module.exports.updatePluginView);
 
-  HHM.manager.registerObserver({ update: () => module.exports.updatePluginView()});
+  HHM.manager.registerEventHandler(() => module.exports.updatePluginView(),
+      [HHM.events.PROPERTY_SET, HHM.events.PLUGIN_DISABLED,
+        HHM.events.PLUGIN_ENABLED]);
   module.exports.updatePluginView();
 };
 

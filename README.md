@@ -31,7 +31,15 @@ The following configuration directives are available currently:
     creating a room. Useful for debugging.
 * `HHM.config.trueHeadless`: If set to true, no HHM UI is going to be created
 
-Always start your configuration file with `HHM.config = HHM.config || {};`, see
+Always start your configuration file with something like
+ 
+ ```javascript
+HHM = typeof HHM === `undefined` ? {} : HHM;
+HHM.baseUrl = HHM.baseUrl || `https://haxplugins.tk/`;
+HHM.config = HHM.config || {};
+```
+ 
+see
 [config/default.js](./config/default.js) for an example and a template to get
 started. If you have uploaded your config somewhere and want to skip the HHM
 configuration form, simply paste the following line in the dev console before
@@ -142,7 +150,7 @@ is, however, entirely optional. Here's an example:
 let room = HBInit();
 
 room.pluginSpec = {
-  name: `author/pluginName`,
+  name: `aut/plugin-name`,
   author: `author`,
   version: `1.0.0`,
   config: {
@@ -159,7 +167,7 @@ room.pluginSpec = {
 }
 ```
 
-* `name`:  The name can be anything, author/pluginName is just a useful convention
+* `name`:  The name can be anything, `aut/plugin-name` is just a useful convention
     to avoid name clashes.
 * `author`: Entirely optional, will be displayed in the UI.
 * `version`: Entirely optional for the moment, will be displayed in the UI. Must
@@ -168,7 +176,7 @@ room.pluginSpec = {
     values may be changed at runtime, so make sure to either always take the
     current value or take a copy of the configuration at a certain point (and
     clearly document the behavior either way).
-* `dependencies`: A list of plugin names that your plugin needs to work. Note
+* `dependencies`: A list of plugin names that your plugin depends on. Note
     that it is possible to check for the availability of plugins at runtime
     (and even try to load additional plugins), so please do not include optional
     dependencies here.
@@ -225,7 +233,8 @@ Let me know if you need help setting up your own repository.
 
 # Building the HHM
 
-You can build the project using `browserify`, see the [makefile](./makefile).
+You can build the project using `browserify` after installing the dependencies
+using `npm install`, see the [makefile](./makefile).
 
 # Feedback
 

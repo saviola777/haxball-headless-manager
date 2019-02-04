@@ -13,7 +13,7 @@
  * @see https://github.com/pimterry/loglevel
  */
 module.exports = function Constructor() {
-  let log = require(`loglevel`);
+  let log = require(`loglevel`).noConflict();
   let loglevelMessagePrefix = require(`@natlibfi/loglevel-message-prefix`);
   log.setLevel(2);
 
