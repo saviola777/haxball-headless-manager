@@ -7,7 +7,7 @@ const config = require(`../ui/config`);
 const ui = require(`../ui`);
 const PluginLoader = require(`./PluginLoader`);
 const TrappedRoomManager = require(`./TrappedRoomManager`);
-const RoomTrapper = require(`@haxroomie/RoomTrapper`);
+const { RoomTrapper } = require(`haxball-room-trapper`);
 const configError = new Error(`Invalid HHM configuration`);
 
 /**
