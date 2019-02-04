@@ -19,8 +19,8 @@
   },
   "homepage": "https://github.com/saviola777/haxball-headless-manager#readme",
   "dependencies": {
-    "@haxroomie/RoomTrapper": "^1.1.1",
-    "@natlibfi/loglevel-message-prefix": "^3.0.1",
+    "haxball-room-trapper": "morko/haxball-room-trapper",
+    "@natlibfi/loglevel-message-prefix": "NatLibFi/loglevel-message-prefix",
     "browserify": "^16.2.3",
     "collections": "^5.1.2",
     "jquery-browserify": "^1.8.1",

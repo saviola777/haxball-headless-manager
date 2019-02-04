@@ -225,14 +225,7 @@ Let me know if you need help setting up your own repository.
 
 # Building the HHM
 
-Two of the NPM dependencies are currently not available directly via NPM, you
-will have to clone them and then call `npm install /path/to/dependency` inside
-the HHM folder (note that NPM will automatically change the package.json):
-
-* [@natlibfi/loglevel-message-prefix](https://github.com/NatLibFi/loglevel-message-prefix)
-* [@haxroomie/RoomTrapper](https://github.com/saviola777/haxroomie-RoomTrapper)
-
-After that you can build it using `browserify`, see the [makefile](./makefile).
+You can build the project using `browserify`, see the [makefile](./makefile).
 
 # Feedback
 
