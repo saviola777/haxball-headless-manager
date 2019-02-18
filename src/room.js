@@ -76,9 +76,10 @@ module.exports.createRoom = function(room, pluginManager) {
         return true;
       } else if (typeof element === `function`) {
         const previousFn = room[name];
+        const definingPlugin = this;
 
         room[name] = function(...args) {
-          if (this.isEnabled()) {
+          if (this.isEnabled() && this.isLoaded()) {
             return element({
               previousFunction: previousFn,
               callingPluginName: this._name,
@@ -86,7 +87,7 @@ module.exports.createRoom = function(room, pluginManager) {
           } else if (typeof previousFn === `function`) {
             return previousFn(...args);
           } else {
-            this.log(`Plugin ${this._name}, which provides function ${name}, `
+            this.log(`Plugin ${definingPlugin._name}, which provides function ${name}, `
               + `is disabled, please make sure to properly declare dependencies `
               + `and honor plugin states.`);
             return () => {};
@@ -118,6 +119,8 @@ module.exports.createRoom = function(room, pluginManager) {
      *
      * @param pluginName Name of the plugin or undefined to create new plugin
      * @param create True if a new plugin should be created if it does not exist
+     *
+     * TODO move to PluginManager
      */
     getPlugin: function(pluginName, create) {
       create = create || false;
@@ -129,7 +132,6 @@ module.exports.createRoom = function(room, pluginManager) {
         room._plugins[id] = pluginManager.roomTrapper.createTrappedRoom(room, id);
         room._plugins[id]._id = room._plugins[id]._name = id;
         room._plugins[id]._lifecycle = { accessed: false, loaded: false };
-        room._pluginsDisabled.push(id);
         pluginRoom = room._plugins[id];
 
         if (pluginName !== undefined) {
@@ -192,10 +194,10 @@ module.exports.createRoom = function(room, pluginManager) {
     },
 
     /**
-     * Returns whether the function has been fully loaded.
+     * Returns whether the plugin has been fully loaded.
      *
-     * A plugin is loaded when all of its dependencies are loaded and its
-     * onLoad event handler (if it exists) has been executed.
+     * A plugin is loaded when all of its dependencies have been loaded and its
+     * onRoomLink handler has been executed.
      */
     isLoaded: function() {
       return this._lifecycle.loaded || false;

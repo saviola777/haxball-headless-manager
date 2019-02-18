@@ -77,7 +77,7 @@ module.exports = class TrappedRoomManager {
 
       if (extraArgsPosition >= 0) {
         args = args.concat(Array(Math.max(0, extraArgsPosition - args.length))
-          .fill(undefined)).concat({ metadata: metadata });
+          .fill(undefined)).concat(metadata);
       }
 
       let returnValue = handler(...args) !== false;
@@ -102,6 +102,17 @@ module.exports = class TrappedRoomManager {
     }
   }
 
+  /**
+   * Returns whether the plugin with the given ID is both enabled and loaded.
+   */
+  _isPluginEnabledAndLoaded(pluginId) {
+    return this.room._pluginManager.isPluginEnabled(pluginId)
+      && this.room.getPluginManager().getPluginById(pluginId).isLoaded();
+  }
+
+  /**
+   * TODO documentation
+   */
   _isValidEventState(handler, metadata, ...args) {
     // If no validator was set, all states are considered valid
     if (this.eventStateValidators[handler] === undefined) {
@@ -120,6 +131,17 @@ module.exports = class TrappedRoomManager {
     }
 
     return true;
+  }
+
+  /**
+   * Makes sure the given handler name is registered so that pre- and post-event
+   * handler hooks for that handler are executed.
+   */
+  _provideHandler(pluginId, handlerName) {
+    // Make sure the handler is registered
+    if (this.room[handlerName] === undefined) {
+      this.room._pluginManager.getPluginById(pluginId)[handlerName] = () => {};
+    }
   }
 
   /**
@@ -147,7 +169,49 @@ module.exports = class TrappedRoomManager {
   }
 
   /**
-   * Determines the execution order for plugins.
+   * Determine execution order for the given plugins and handler name.
+   */
+  determineExecutionOrder(pluginIds, handlerName) {
+    let vertices = [];
+
+    // Establish execution order dependencies for each plugin
+    for (let pluginId of pluginIds) {
+      let pluginSpec = this.room.getPluginManager().getPluginById(pluginId)
+          .getPluginSpec();
+
+      if (!pluginSpec.hasOwnProperty(`order`)) {
+        continue;
+      }
+
+      this._addVertices(vertices, pluginId, handlerName, `before`, true);
+      this._addVertices(vertices, pluginId, handlerName, `after`, false);
+    }
+
+    // Sort based on vertices
+    try {
+      const executionOrder = toposort(vertices);
+
+      // Insert all plugins without execution order dependencies at the end
+      for (let pluginId of pluginIds) {
+        if (executionOrder.indexOf(pluginId) === -1) {
+          executionOrder.push(pluginId);
+        }
+      }
+
+      return executionOrder;
+    }
+    catch (e) {
+      let pluginId = e.message.split('"')[1];
+      let pluginName = this.room._pluginManager.getPluginById(pluginId)._name;
+
+      HHM.log.error(`There was a cyclic dependency for handler ${handlerName} and plugin ${pluginName}`);
+      //HHM.log.error(this.room._pluginManager._createDependencyChain(pluginId, []));
+      throw(e);
+    }
+  }
+
+  /**
+   * Determines the execution order for all plugins and handlers.
    */
   determineExecutionOrders() {
     this.handlerExecutionOrders = {};
@@ -170,32 +234,8 @@ module.exports = class TrappedRoomManager {
         continue;
       }
 
-      let vertices = [];
-
-      // Establish execution order dependencies for each plugin
-      for (let pluginId of pluginIds) {
-        let pluginSpec = this.room.getPluginManager().getPluginById(pluginId)
-          .getPluginSpec();
-
-        if (!pluginSpec.hasOwnProperty(`order`)) {
-          continue;
-        }
-
-        this._addVertices(vertices, pluginId, handlerName, `before`, true);
-        this._addVertices(vertices, pluginId, handlerName, `after`, false);
-      }
-
-      // Sort based on vertices
-      const executionOrder = toposort(vertices);
-
-      // Insert all plugins without execution order dependencies at the end
-      for (let pluginId of pluginIds) {
-        if (executionOrder.indexOf(pluginId) === -1) {
-          executionOrder.push(pluginId);
-        }
-      }
-
-      this.handlerExecutionOrders[handlerName] = executionOrder;
+      this.handlerExecutionOrders[handlerName] =
+          this.determineExecutionOrder(pluginIds, handlerName);
     }
 
     this.handlersDirty = false;
@@ -393,7 +433,7 @@ module.exports = class TrappedRoomManager {
       for (let pluginId of
           Object.getOwnPropertyNames(this.preEventHandlerHooks[handler])) {
 
-        if (!this.room._pluginManager.isPluginEnabled(pluginId)) {
+        if (!this._isPluginEnabledAndLoaded(pluginId)) {
           continue;
         }
 
@@ -413,7 +453,7 @@ module.exports = class TrappedRoomManager {
     if (this.handlerExecutionOrders.hasOwnProperty(handler)) {
       for (let pluginId of this.handlerExecutionOrders[handler]) {
         // Skip disabled plugins
-        if (!this.room._pluginManager.isPluginEnabled(pluginId)) {
+        if (!this._isPluginEnabledAndLoaded(pluginId)) {
           continue;
         }
 
@@ -433,7 +473,7 @@ module.exports = class TrappedRoomManager {
       for (let pluginId of
           Object.getOwnPropertyNames(this.postEventHandlerHooks[handler])) {
 
-        if (!this.room._pluginManager.isPluginEnabled(pluginId)) {
+        if (!this._isPluginEnabledAndLoaded(pluginId)) {
           continue;
         }
 
@@ -553,6 +593,8 @@ module.exports = class TrappedRoomManager {
 
     this.preEventHandlerHooks[handlerName][pluginId].push(hook);
 
+    this._provideHandler(pluginId, handlerName);
+
     return this;
   }
 
@@ -575,6 +617,8 @@ module.exports = class TrappedRoomManager {
     }
 
     this.postEventHandlerHooks[handlerName][pluginId].push(hook);
+
+    this._provideHandler(pluginId, handlerName);
 
     return this;
   }

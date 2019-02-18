@@ -1,3 +1,20 @@
+# Version 0.9.0
+
+- ditch GUI, [haxroomie-web](https://github.com/morko/haxroomie-web) does a
+  better job of it
+- adjust default configurations to support haxroomie
+- remove dryRun, trueHeadless, sendChatMaxLength from config
+- start organising documentation (still useless, sorry!)
+- revert back to old approach where plugins are only loaded after the room link
+  is available. This makes everything easier, so deal with the minimal delay!
+- fix problems with injected destructuring parameters
+- remove custom event `onLoad`, please use `onRoomLink` for initialization
+- when loading plugins by code, a name can now be passed along
+- fix problem where plugin names were not picked up from the pluginSpec
+- add event system for HHM-related events (plugin loaded/enabled/disabled)
+- `_postInit` plugin is now called `_user/postInit`
+- add custom event handlers `onEnable` and `onDisable`
+
 # Version 0.8.1
 
 - fix npm dependencies to automatically install from github repositories where

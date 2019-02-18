@@ -3,8 +3,6 @@
  */
 
 const $ = require(`jquery-browserify`);
-const config = require(`../ui/config`);
-const ui = require(`../ui`);
 const PluginLoader = require(`./PluginLoader`);
 const TrappedRoomManager = require(`./TrappedRoomManager`);
 const { RoomTrapper } = require(`haxball-room-trapper`);
@@ -46,27 +44,25 @@ module.exports = class PluginManager {
    * or false if there was an error, or the loadStack if it was given.
    *
    * This function recursively loads a plugin and its dependencies and passes a
-   * load stack around which contains IDs of loaded plugins in the load order,
-   * so that at the end of the recursion, the onLoad handlers can be triggered
-   * in reverse order.
+   * load stack around which contains IDs of loaded plugins in the load order.
    *
    * When initially calling this function, do not pass a loadStack, the function
    * will then return the ID of the loaded plugin or false if there was an error
    */
   async _addPlugin(pluginName, pluginCode, loadStack) {
-    const executeLoadStack = loadStack === undefined;
+    const initializePlugins = loadStack === undefined;
     loadStack = loadStack || [];
     let pluginId = -1;
 
-    if (typeof pluginName !== `undefined`) {
+    if (pluginName !== undefined && this.room.hasPlugin(pluginName)) {
       // Avoid loading plugins twice
-      if (this.room.hasPlugin(pluginName)) {
         return loadStack || this.room.getPluginId(pluginName);
-      }
+    }
 
+    if (pluginCode === undefined) {
       pluginId = await this.pluginLoader.tryToLoadPluginByName(pluginName);
     } else {
-      pluginId = this.pluginLoader.tryToLoadPluginByCode(pluginCode);
+      pluginId = this.pluginLoader.tryToLoadPluginByCode(pluginCode, pluginName);
     }
 
     loadStack = await this._checkPluginAndLoadDependencies(pluginId,
@@ -80,50 +76,13 @@ module.exports = class PluginManager {
       // Merge user config
       this._mergeConfig(pluginName, (HHM.config.plugins || {})[pluginName]);
 
-      if (executeLoadStack) {
-        this._executeLoadStack(loadStack);
-      }
-
-      HHM.log.info(`Plugin added successfully: ${pluginName}`);
-    }
-
-    return executeLoadStack ? (success ? pluginId : false) : loadStack;
-  }
-
-  /**
-   * Make sure that all dependencies are loaded.
-   *
-   * If any dependency is not satisfied, an exception will be thrown.
-   *
-   * TODO needed? All dependencies should be satisfied at all times
-   * automatically now
-   *
-   * @see _checkDependencyLoaded
-   */
-  _checkDependencies() {
-    const pluginNames = Object.getOwnPropertyNames(this.room._plugins);
-
-    // Check user config plugins
-    for (let pluginName of Object.getOwnPropertyNames(HHM.config.plugins))
-    {
-      this._checkDependencyLoaded(pluginName, pluginNames);
-    }
-
-    for (let pluginName of pluginNames) {
-      let pluginRoom = this.room._plugins[pluginName];
-      let pluginSpec = pluginRoom.getPluginSpec();
-
-      if (!pluginSpec.hasOwnProperty(`dependencies`)) {
-        continue;
-      }
-
-      for (let dependency of
-          Object.getOwnPropertyNames(pluginSpec.dependencies)) {
-        this._checkDependencyLoaded(dependency, pluginNames);
+      if (initializePlugins) {
+        HHM.log.info(`Loading plugin ${pluginName} and its dependencies`);
+        this._executeRoomLinkHandlers(loadStack);
       }
     }
 
-    return true;
+    return initializePlugins ? (success ? pluginId : false) : loadStack;
   }
 
   /**
@@ -273,17 +232,33 @@ module.exports = class PluginManager {
    * @return boolean False if the plugin and its dependencies were already
    *  enabled, true otherwise
    */
-  _enablePluginAndDependencies(pluginId) {
+  _enablePluginAndDependencies(pluginId, enabledPlugins = []) {
     let dependenciesEnabled = false;
+    enabledPlugins.push(pluginId);
     for (let dependency of
         this.getPluginById(pluginId).getPluginSpec().dependencies || []) {
-        dependenciesEnabled = dependenciesEnabled
-            || this._enablePluginAndDependencies(this.getPluginId(dependency));
+
+      let dependencyId = this.getPluginId(dependency);
+
+      if (enabledPlugins.indexOf(dependencyId) !== -1) {
+        continue;
+      }
+
+      dependenciesEnabled = dependenciesEnabled
+          || this._enablePluginAndDependencies(dependencyId, enabledPlugins);
     }
 
     const pluginIndex = this.room._pluginsDisabled.indexOf(pluginId);
     if (pluginIndex !== -1) {
+
+      const plugin = this.getPluginById(pluginId);
+
+      if (plugin.onEnable !== undefined) {
+        plugin.onEnable();
+      }
+
       this.room._pluginsDisabled.splice(pluginIndex, 1);
+
 
       this.dispatchEvent({
         type: HHM.events.PLUGIN_ENABLED,
@@ -297,36 +272,64 @@ module.exports = class PluginManager {
   }
 
   /**
-   * Executes the given load stack in reverse order.
-   *
-   * TODO delete onLoad and onRoomLink handlers?
+   * TODO documentation
    */
-  _executeLoadStack(loadStack) {
-    [...new Set(loadStack.reverse())].map(id => {
+  _executeRoomLinkHandlers(loadStack) {
+
+    loadStack = [...new Set(loadStack)];
+
+    loadStack.map(id => {
       let plugin = this.getPluginById(id);
 
-      if (typeof plugin.onLoad === `function`) {
-        plugin.onLoad();
-        //delete plugin.onLoad;
+      // Add dummy onRoomLink handler if none exists, to keep proper execution
+      // order
+      if (typeof plugin.onRoomLink !== `function`) {
+        plugin.onRoomLink = () => {};
       }
+
+      const pluginSpec = plugin.getPluginSpec();
+
+      if (pluginSpec.dependencies === undefined ||
+          pluginSpec.dependencies.length === 0) return;
+
+      pluginSpec.order = pluginSpec.order || {};
+      const onRoomLinkOrder = pluginSpec.order.onRoomLink || {};
+      onRoomLinkOrder.after = onRoomLinkOrder.after || [];
+
+      for (let dependency of pluginSpec.dependencies) {
+        // Allow self-dependency to avoid a plugin being disabled
+        if (dependency === plugin._name) continue;
+
+        onRoomLinkOrder.after.push(dependency);
+      }
+
+      onRoomLinkOrder.after = [...new Set(onRoomLinkOrder.after)];
+      pluginSpec.order.onRoomLink = onRoomLinkOrder;
+      plugin.pluginSpec = pluginSpec;
+    });
+
+    const onRoomLinkExecutionOrder = this.room._trappedRoomManager
+        .determineExecutionOrder(loadStack, `onRoomLink`)
+        .filter((id) => loadStack.indexOf(id) !== -1);
+
+    HHM.log.info(`Loading the following plugins:`);
+    HHM.log.info(onRoomLinkExecutionOrder.map(
+        (id) => this.getPluginById(id)._name).join(", "));
+
+    for (let pluginId of onRoomLinkExecutionOrder) {
+      let plugin = this.getPluginById(pluginId);
+
+      plugin.onRoomLink(HHM.roomLink);
 
       plugin._lifecycle.loaded = true;
 
-      // Enable plugin only after onLoad was executed
-      this.room._pluginsDisabled.splice(
-          this.room._pluginsDisabled.indexOf(id), 1);
+      HHM.log.info(`Plugin loaded successfully: ${plugin._name}`);
 
       this.dispatchEvent({
         type: HHM.events.PLUGIN_LOADED,
         plugin: plugin,
       });
-
-      if (this.hasPluginById(this.getPluginId(`hhm/core`)) &&
-          plugin.isRoomStarted() && typeof plugin.onRoomLink === `function`) {
-        plugin.onRoomLink(plugin.getRoomLink());
-        //delete plugin.onRoomLink;
-      }
-    });
+    }
   }
 
   /**
@@ -340,7 +343,7 @@ module.exports = class PluginManager {
         if (propertyValue.hasOwnProperty(`name`)
           && propertyValue.name !== plugin._name) {
 
-          this.room._pluginIds[plugin._name] = plugin._id;
+          this.room._pluginIds[propertyValue.name] = plugin._id;
           plugin._name = propertyValue.name;
 
         } else if (plugin._name !== plugin._id) {
@@ -360,6 +363,13 @@ module.exports = class PluginManager {
         return true;
       }
     }, [HHM.events.PROPERTY_SET]);
+
+    this.room.onRoomLink =
+        (roomLink) => {
+          HHM.roomLink = roomLink;
+          HHM.deferreds.roomLink.resolve();
+          delete this.room.onRoomLink;
+        };
   }
 
   /**
@@ -415,16 +425,13 @@ module.exports = class PluginManager {
    */
   async _postInit() {
     if (HHM.config.hasOwnProperty(`postInit`) && !HHM.config.dryRun) {
-      const postInitPluginId = await this.addPluginByCode(HHM.config.postInit);
+      const postInitPluginId = await this.addPluginByCode(HHM.config.postInit,
+          `_user/postInit`);
 
       if (postInitPluginId < 0) {
         HHM.log.error(`Unable to execute postInit code, please check the code`);
       } else {
         const postInitPlugin = this.room._plugins[postInitPluginId];
-
-        if (!postInitPlugin.hasName()) {
-          postInitPlugin.setName(`_postInit`);
-        }
 
         HHM.log.info(`postInit code executed`);
       }
@@ -479,11 +486,14 @@ module.exports = class PluginManager {
   /**
    * Loads the plugin and its dependencies from the given code.
    *
+   * If you specify a plugin name, it can be overwritten from the loaded plugin
+   * code.
+   *
    * @return Plugin ID if the plugin and all of its dependencies have been
    * loaded, -1 otherwise.
    */
-  async addPluginByCode(pluginCode) {
-    return await this._addPlugin(undefined, pluginCode);
+  async addPluginByCode(pluginCode, pluginName) {
+    return await this._addPlugin(pluginName, pluginCode);
   }
 
   /**
@@ -511,6 +521,12 @@ module.exports = class PluginManager {
       return true;
     }
 
+    const plugin = this.getPluginById(pluginId);
+
+    if (plugin.onDisable !== undefined) {
+      plugin.onDisable();
+    }
+
     this.room._pluginsDisabled.push(pluginId);
 
     this.dispatchEvent({
@@ -532,10 +548,12 @@ module.exports = class PluginManager {
 
   /**
    * Returns a list of plugin IDs for currently enabled plugins.
+   *
+   * Be aware that this list may contain plugins that are not yet fully loaded.
    */
   getEnabledPluginIds() {
     return Object.getOwnPropertyNames(this.room._plugins)
-      .filter(id => this.isPluginEnabled(id));
+        .filter(id => this.isPluginEnabled(id));
   }
 
   /**
@@ -631,7 +649,7 @@ module.exports = class PluginManager {
    * functionality like access to plugins.
    */
   provideRoom(room) {
-    if (!config.isLoaded()) {
+    if (HHM.config === undefined) {
       HHM.log.error(`No configuration loaded`);
       return;
     }
@@ -683,7 +701,7 @@ module.exports = class PluginManager {
    * aborted.
    */
   async start(room) {
-    if (!config.isLoaded()) {
+    if (HHM.config === undefined) {
       HHM.log.error(`No configuration loaded`);
       return;
     }
@@ -704,6 +722,10 @@ module.exports = class PluginManager {
         HHM.config.repositories || []);
 
     this._initializeCoreEventHandlers();
+
+    HHM.log.info(`Waiting for room link`);
+
+    await HHM.deferreds.roomLink.promise();
 
     await this._addPlugin(`hhm/core`);
 

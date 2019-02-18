@@ -5,7 +5,7 @@
 
 module.exports.populate = () => {
   global.HHM = global.HHM || {};
-  global.HHM.version = `0.8.0-git`;
+  global.HHM.version = `0.9.0-git`;
   global.HHM.baseUrl = HHM.baseUrl || `https://haxplugins.tk/`;
   global.HHM.proxyUrl = HHM.proxyUrl || `https://haxplugins.tk/proxy/`;
   global.HHM.defaultConfigUrl = `${HHM.baseUrl}config/default.js`;
@@ -52,7 +52,8 @@ module.exports.populate = () => {
     /**
      * Triggered when a plugin was loaded.
      *
-     * Triggered after the onLoad function for the given plugin has been called.
+     * Triggered after the onRoomLink function for the given plugin has been
+     * called.
      *
      * Event data:
      *  - plugin: the loaded plugin

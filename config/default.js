@@ -2,19 +2,24 @@ HHM = typeof HHM === `undefined` ? {} : HHM;
 HHM.baseUrl = HHM.baseUrl || `https://haxplugins.tk/`;
 HHM.config = HHM.config || {};
 
+haxroomie = typeof haxroomie === `undefined` ? {} : haxroomie;
+
 /**
  * Include your room config here (the object that will be passed to HBInit).
  *
  * If set to false, you will have to call PluginManager#start manually with a
  * room instance to start the plugin system.
+ *
+ * Please only adjust values on the right side of '||'.
  */
 HHM.config.room = {
-  roomName: `HHM room`,
-  playerName : `:`,
-  maxPlayers: 16,
-  //password : `hhm`,
-  public : false,
-  geo: {code: `FI`, lat: 60.192059, lon: 24.945831},
+  roomName: haxroomie.roomName || `haxroomie`,
+  playerName : haxroomie.playerName || `host`,
+  maxPlayers: haxroomie.maxPlayers || 16,
+  public : haxroomie.hasOwnProperty('public') ? haxroomie.public : false,
+  password: haxroomie.password,
+  geo: haxroomie.geo || {code: `FI`, lat: 60.192059, lon: 24.945831},
+  token: haxroomie.token || "insert your token here"
 };
 
 /**
@@ -36,22 +41,15 @@ HHM.config.postInit = HBInit => {
 /**
  * This is the heart of the HHM config: a collection of plugins to load and
  * their corresponding configurations.
- *
- * If you leave this empty, you will have to load plugins through the UI.
  */
 HHM.config.plugins = {
-  'sav/commands': {
-    commandPrefix: `!`,
-  },
   'sav/roles': {
     roles: {
-      'host': `otherpw`,
-      'admin': `somepw`,
+      'host': ``,
+      'admin': haxroomie.adminPassword || 'haxroomie'
     },
   },
-  'sav/plugin-control': {},
-  'sav/chat': {},
-  'sav/players': {},
+  'sav/core': {},
 };
 
 /**
@@ -86,35 +84,6 @@ HHM.config.repositories = [
     url: `${HHM.baseUrl}plugins/fm/`,
   },
 ];
-
-/**
- * Set this to true to check the HHM config without creating a room.
- *
- * Dependency resolution and execution order will be determined without the need
- * for a real room object. May not work for plugins that require the room to be
- * up at load time.
- *
- * @type {boolean}
- */
-HHM.config.dryRun = false;
-
-/**
- * Indicate to HHM and its plugins that you want to run in true headless mode,
- * meaning that any and all optional output to the website will be omitted
- * (logging, forms etc.).
- *
- * @type {boolean}
- */
-HHM.config.trueHeadless = false;
-
-/**
- * Overlong messages are automatically split in the HHM sendChat
- * implementation. To avoid (accidental) chat flooding, no message can be
- * longer than this value.
- *
- * By default this limits the output to 20 lines.
- */
-HHM.config.sendChatMaxLength = 2686;
 
 // Load HHM if it has not already been loaded
 if (HHM.manager === undefined) {

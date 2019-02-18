@@ -31,9 +31,11 @@ module.exports = class FunctionReflector {
     const params = this.forFunction(func).params;
     const numParams = params.length;
 
+    // It's enough to check if it's destructuring, since a bug in the library
+    // does not detect destructuring parameters with default parameters as
+    // destructuring, but as normal parameters
     if (args.length < numParams
-        && params[numParams - 1].type === `DESTRUCTURING`
-        && !params[numParams - 1].hasOwnProperty(`value`)) {
+        && params[numParams - 1].type === `DESTRUCTURING`) {
       return numParams - 1;
     }
 

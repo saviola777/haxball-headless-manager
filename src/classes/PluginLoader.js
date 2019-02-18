@@ -84,7 +84,7 @@ module.exports = class PluginLoader {
                 `loaded for plugin ${pluginName}`);
             that.room._pluginManager._removePlugin(pluginRoom._id);
           } else {
-            HHM.log.info(`Plugin loaded: ${pluginUrl}`);
+            HHM.log.info(`Plugin source loaded: ${pluginUrl}`);
           }
         },
       });
@@ -144,8 +144,8 @@ module.exports = class PluginLoader {
    *
    * @return the ID of the plugin or -1 if it couldn't be loaded.
    */
-  tryToLoadPluginByCode(pluginCode) {
-    const pluginRoom = this.room.getPlugin();
+  tryToLoadPluginByCode(pluginCode, pluginName) {
+    const pluginRoom = this.room.getPlugin(pluginName, true);
     this._executePlugin(pluginCode, pluginRoom);
 
     return pluginRoom._id;

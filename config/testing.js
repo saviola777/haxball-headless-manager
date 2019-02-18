@@ -2,16 +2,25 @@ HHM = typeof HHM === `undefined` ? {} : HHM;
 HHM.baseUrl = HHM.baseUrl || `https://haxplugins.tk/testing/`;
 HHM.config = HHM.config || {};
 
+haxroomie = typeof haxroomie === `undefined` ? {} : haxroomie;
+
+/**
+ * Include your room config here (the object that will be passed to HBInit).
+ *
+ * If set to false, you will have to call PluginManager#start manually with a
+ * room instance to start the plugin system.
+ */
 HHM.config.room = {
-  roomName: `HHM room`,
-  playerName : `:`,
-  maxPlayers: 16,
-  //password : `hhm`,
-  public : false,
-  geo: {code: `FI`, lat: 60.192059, lon: 24.945831},
+  roomName: haxroomie.roomName || `haxroomie`,
+  playerName : haxroomie.playerName || `host`,
+  maxPlayers: haxroomie.maxPlayers || 16,
+  public : haxroomie.hasOwnProperty('public') ? haxroomie.public : false,
+  password: haxroomie.password,
+  geo: haxroomie.geo || {code: `FI`, lat: 60.192059, lon: 24.945831},
+  token: haxroomie.token,
 };
 
-HHM.config.postInit = HBInit => {
+ HHM.config.postInit = HBInit => {
   let room = HBInit();
 
   room.onRoomLink = () => {
@@ -22,18 +31,13 @@ HHM.config.postInit = HBInit => {
 };
 
 HHM.config.plugins = {
-  'sav/commands': {
-    commandPrefix: `!`,
-  },
   'sav/roles': {
     roles: {
-      'host': `otherpw`,
-      'admin': `somepw`,
+      'host': ``,
+      'admin': haxroomie.adminPassword || 'haxroomie'
     },
   },
-  'sav/plugin-control': {},
-  'sav/chat': {},
-  'sav/players': {},
+  'sav/core': {},
 };
 
 HHM.config.repositories = [
@@ -44,12 +48,6 @@ HHM.config.repositories = [
     url: `${HHM.baseUrl}plugins/fm/`,
   },
 ];
-
-HHM.config.dryRun = false;
-
-HHM.config.trueHeadless = false;
-
-HHM.config.sendChatMaxLength = 2686;
 
 // Load HHM if it has not already been loaded
 if (HHM.manager === undefined) {
