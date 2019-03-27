@@ -1,6 +1,6 @@
 {
   "name": "@saviola777/haxball-headless-manager",
-  "version": "0.9.0-git",
+  "version": "0.9.1-git",
   "description": "Plugin manager for headless HaxBall hosts.",
   "main": "index.js",
   "repository": {
@@ -21,11 +21,16 @@
   "dependencies": {
     "haxball-room-trapper": "morko/haxball-room-trapper",
     "@natlibfi/loglevel-message-prefix": "NatLibFi/loglevel-message-prefix",
-    "browserify": "^16.2.3",
     "collections": "^5.1.2",
     "jquery-browserify": "^1.8.1",
     "js-function-reflector": "^2.0.3",
     "loglevel": "^1.6.1",
-    "toposort": "^2.0.2"
+    "toposort": "^2.0.2",
+    "localforage": "^1.7.3"
+  },
+  "devDependencies": {
+    "browserify": "^16.2.3",
+    "foodoc": "0.0.9",
+    "jsdoc": "^3.5.5"
   }
 }

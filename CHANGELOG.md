@@ -1,3 +1,31 @@
+# Version 0.9.1
+
+- add JsDoc documentation to HHM code
+- add repository information in README and config
+- improve repository handling
+- move some Node dependencies to `devDependencies`
+- improve event handler execution metadata API
+- function reflector now works for `Function` objects and string
+  representations of functions
+- improve status management of loaded / enabled plugins
+- disable caching for AJAX calls
+- clean up plugin and plugin manager interfaces
+- fix bug in plugin enabling code where recursive enabling would fail
+- begin clean up of different event system: HHM, local, global events
+- add event which is executed before a plugin is marked as loaded but
+  after its `onRoomLink` handler has been executed
+- add observer pattern for plugin configuration changes
+- HHM start fails now if one of the initial plugins (core, persistence)
+  fail to load
+- improve pre/post event handler hooks and event state validation system
+- fix TrappedRoomManager interface
+- fix a problem where calling `isLoaded()` on a plugin in a very early
+  state of initialization would cause an error
+- add storage support using localForage
+- make event API more consistent, just like the native API player
+  objects will now be passed to handlers
+
+
 # Version 0.9.0
 
 - ditch GUI, [haxroomie-web](https://github.com/morko/haxroomie-web) does a

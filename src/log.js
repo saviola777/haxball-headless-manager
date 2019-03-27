@@ -10,9 +10,21 @@
  *
  * Levels can be accessed via HHM.log.level.*
  *
+ * @module src/log
  * @see https://github.com/pimterry/loglevel
  */
-module.exports = function Constructor() {
+
+/**
+ * Creates a new loglevel logger instance, with a static `HHM` prefix and
+ * dynamic level prefix.
+ *
+ * @TODO make initial log level configurable
+ * @TODO document log levels
+ *
+ * @alias module:src/log.constructor
+ * @returns {Object} Logger instance.
+ */
+function constructor() {
   let log = require(`loglevel`).noConflict();
   let loglevelMessagePrefix = require(`@natlibfi/loglevel-message-prefix`);
   log.setLevel(2);
@@ -36,4 +48,6 @@ module.exports = function Constructor() {
   log.info(`LogLevel library loaded`);
 
   return log;
-};
+}
+
+module.exports = constructor;

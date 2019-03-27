@@ -15,6 +15,4 @@ HHM.deferreds.roomLink = new $.Deferred();
 
 // Provides the config, waits for captcha solution and starts the plugin
 // manager
-let room = HHM.manager.provideRoom();
-
-HHM.manager.start(room);
+HHM.manager.start();

@@ -1,23 +1,25 @@
-/**
- * Plugin loader module.
- */
-
-/**
- * Repository defaults.
- */
+// Repository defaults.
 const repositoryDefaults = {
-  suffix: `.js`
+  type: `plain`,
+  suffix: `.js`,
 };
 
 /**
  * PluginLoader class, responsible for loading plugins via repositories or via
  * code.
+ *
+ * @class PluginLoader
+ * @property {HhmRoomObject} room Room object.
+ * @property {Object.<string, Function>} repositoryTypeHandlers Handler
+ *  functions for different repository types, see
+ *  {@link module:src/repositories}.
  */
-module.exports = class PluginLoader {
+class PluginLoader {
 
   constructor(room, repositories) {
     this._class = `PluginLoader`;
     this.room = room;
+    this.repositoryTypeHandlers = require(`../repositories`);
 
     this._prepareRepositoryConfigurations(repositories);
   }
@@ -25,48 +27,62 @@ module.exports = class PluginLoader {
   /**
    * Create and execute the plugin in a function context, passing a single
    * argument 'HBInit', which is a function returning the trapped room
+   *
+   * @function PluginLoader#_executePlugin
+   * @private
+   * @param {(Function|string)} pluginCode Plugin code as either a function
+   *  or a string.
+   * @param {external:haxball-room-trapper.TrappedRoom} pluginRoom Trapped room
+   *  for the plugin.
+   * @param {string} [pluginName] Default plugin name, will be overwritten by
+   *  the name property of the `pluginSpec` if given.
    */
-  _executePlugin(pluginSource, pluginRoom, pluginName) {
+  _executePlugin(pluginCode, pluginRoom, pluginName) {
     const HBInit = () => {
-      pluginRoom._lifecycle.accessed = true;
+      pluginRoom._lifecycle.valid = true;
       return pluginRoom;
     };
 
     try {
-      if (typeof pluginSource === `function`) {
-        pluginSource(HBInit);
+      if (typeof pluginCode === `function`) {
+        pluginCode(HBInit);
       } else {
-        Function.apply(null, [`HBInit`, pluginSource])(HBInit);
+        Function.apply(null, [`HBInit`, pluginCode])(HBInit);
       }
     } catch (e) {
       HHM.log.error(`Unable to execute plugin: ${e.message}`);
+      pluginRoom._lifecycle.valid = false;
     }
 
     if (typeof pluginName !== `undefined`
         && pluginRoom.hasOwnProperty(`pluginSpec`)
         && !pluginRoom.pluginSpec.hasOwnProperty(`name`)) {
-      // Assign it this way to trigger onPropertySet
-      let pluginSpec = pluginRoom.pluginSpec;
-      pluginSpec.name = pluginName;
-      pluginRoom.pluginSpec = pluginSpec;
+      pluginRoom._name = pluginName;
     }
+
+    pluginRoom._source = typeof pluginCode === `function`
+        ? pluginCode.toString() : pluginCode;
   }
 
   /**
    * Loads a plugin with the given name from the given URL.
    *
-   * The plugin will be loaded as plain text from the given URL (CORS policy
-   * must be set properly at the given URL!) and then executed in a function
-   * context.
+   * The plugin will be loaded as plain text from the given URL and then
+   * executed in a function context.
    *
-   * @see _createPluginFunction
-   * @return Plugin ID if it was loaded or -1 otherwise
+   * @function PluginLoader#_loadPlugin
+   * @private
+   * @param {string} pluginUrl Plugin URL.
+   * @param {string} [pluginName] Optional default plugin name.
+   * @returns {number} Plugin ID if it was loaded or -1 otherwise
+   * @see PluginLoader#_executePlugin
    */
   async _loadPlugin(pluginUrl, pluginName) {
     const that = this;
 
     try {
       await $.ajax({
+        cache: false,
         crossDomain: true,
         url: pluginUrl,
         dataType: `text`,
@@ -80,8 +96,8 @@ module.exports = class PluginLoader {
 
           if (!that.room._pluginManager.hasPluginById(pluginRoom._id)) {
             HHM.log.error(
-                `Repository did not return an error but plugin was not ` +
-                `loaded for plugin ${pluginName}`);
+                `Invalid plugin ${pluginName}, either an error happened ` +
+                `during plugin execution or HBInit() was not called`);
             that.room._pluginManager._removePlugin(pluginRoom._id);
           } else {
             HHM.log.info(`Plugin source loaded: ${pluginUrl}`);
@@ -99,50 +115,116 @@ module.exports = class PluginLoader {
   /**
    * Prepare the repository configurations.
    *
-   * Merge defaults for missing values from repositoryDefaults.
+   * Adds the given repositories using {@link PluginLoader#addRepository}.
+   *
+   * @function PluginLoader#_prepareRepositoryConfigurations
+   * @private
+   * @param {Array.<(string|Object)>} repositories Array of repositories, as
+   *  strings or objects.
+   * @see module:src/repositories
    */
   _prepareRepositoryConfigurations(repositories) {
     this.repositories = [];
     let repositoryObject;
     for (let repository of repositories) {
-      if (typeof repository === `string`) {
-        repositoryObject = $.extend({ url: repository }, repositoryDefaults);
-      } else {
-        repositoryObject = $.extend({}, repositoryDefaults, repository);
-      }
-
-      this.repositories.push(repositoryObject);
+      this.addRepository(repository, true);
     }
   }
 
   /**
    * Adds a repository.
+   *
+   * The repository can be specified as a `string`, then it is interpreted as
+   * the `URL` of a `plain` type repository, or as an `Object`.
+   *
+   * If `append` is set to `true`, the new repository will be added with the
+   * lowest priority, i.e. plugins will only be loaded from it they can't be
+   * found in any other repository. Otherwise the repository will be added with
+   * the highest priority.
+   *
+   * For more control over repository order, feel free to directly change the
+   * `repositories` `Array`.
+   *
+   * The following default values are set if the given repository does not
+   * include them:
+   *
+   * - `type`: `plain`
+   * - `suffix`: `.js`
+   *
+   * @function PluginLoader#addRepository
+   * @param {(string|Object)} repository The repository to be added, as `string`
+   *  or `Object`.
+   * @param {boolean} [append] Whether to append or prepend the repository to
+   *  the `Array` of repositories.
+   * @returns {boolean} Whether the repository was successfully added.
    */
-  addRepository(repository, suffix) {
-    if (!repository.startsWith(`https`)) {
-      HHM.log.warn(`Could not add repository at ${repository} because the `
-        + `URL does not start with https`);
-      return;
+  addRepository(repository, append = false) {
+    let repositoryObject;
+
+    if (typeof repository === `string`) {
+      repositoryObject = $.extend({ url: repository }, repositoryDefaults);
+    } else {
+      repositoryObject = $.extend({}, repositoryDefaults, repository);
     }
 
-    for (let repositoryObject of this.repositories) {
-      if (repositoryObject.url === repository) {
-        return;
+    if (this.repositoryTypeHandlers[repositoryObject.type] === undefined) {
+      HHM.log.error(`No handler for repository type "${repositoryObject.type}"`);
+      return false;
+    }
+
+    // Check if repository exists
+    let testPluginName = `hhm/core`;
+    for (let existingRepository of this.repositories) {
+      if (this.repositoryTypeHandlers[existingRepository.type](
+          existingRepository, testPluginName)
+          === this.repositoryTypeHandlers[repositoryObject.type](
+              repositoryObject, testPluginName)) {
+
+        HHM.log.warn(`Skipping duplicate repository entry for repository of`
+            + `type "${repositoryObject.type}"`);
+        return false;
       }
     }
 
-    if (this.repositories.indexOf(repository) === -1) {
-      this.repositories.push({
-        url: repository,
-        suffix: suffix || repositoryDefaults.suffix
-      });
+    append ? this.repositories.push(repositoryObject)
+        : this.repositories.unshift(repositoryObject);
+
+    return true;
+  }
+
+  /**
+   * Adds a function which generates a URL based on the repository configuration
+   * and a plugin name.
+   *
+   * @function PluginLoader#registerRepositoryTypeHandler
+   * @param repositoryType String identifying the repository type.
+   * @param handler Function which will receive two arguments (repository object
+   *  and plugin name) and is expected to return an HTTPs URL which can be used
+   *  to load the plugin, or false in case of errors.
+   * @returns {boolean} Whether the repository type handler was successfully
+   *  registered.
+   */
+  registerRepositoryTypeHandler(repositoryType, handler) {
+    if (typeof handler !== `function` || handler.length < 2) {
+      HHM.log.error(`Invalid repository type handler, must be function with`
+          + `at least two arguments`);
+      return false;
     }
+
+    this.repositoryTypeHandlers[repositoryType] = handler;
+
+    return true;
   }
 
   /**
    * Tries to load a plugin from the plugin code.
    *
-   * @return the ID of the plugin or -1 if it couldn't be loaded.
+   * @function PluginLoader#tryToLoadPluginByCode
+   * @param {(string|Function)} pluginCode Plugin code as `string` or `Function`.
+   * @param {string} [pluginName] Optional default plugin name, used only if the
+   *  plugin code does not set a name.
+   * @returns {number} the ID of the plugin or -1 if it couldn't be loaded.
+   * @see PluginLoader#_executePlugin
    */
   tryToLoadPluginByCode(pluginCode, pluginName) {
     const pluginRoom = this.room.getPlugin(pluginName, true);
@@ -154,13 +236,29 @@ module.exports = class PluginLoader {
   /**
    * Tries to load the given plugin from the configured repositories.
    *
-   * @return the ID of the plugin or -1 if it couldn't be loaded.
+   * @function PluginLoader#tryToLoadPluginByName
+   * @param {string} pluginName Name of the plugin to be loaded.
+   * @returns {number} The ID of the plugin or -1 if it couldn't be loaded.
    */
   async tryToLoadPluginByName(pluginName) {
     for (let repository of this.repositories) {
-      let pluginUrl = repository.url + pluginName + repository.suffix;
+      // TODO create specific repository URL
+      if (this.repositoryTypeHandlers[repository.type] === undefined) {
+        HHM.log.debug(`No handler for repository type ${repository.type}`);
+        continue;
+      }
 
-      HHM.log.debug(`Trying to load plugin: ${pluginUrl} from repository ${repository}`);
+      let pluginUrl = this.repositoryTypeHandlers[repository.type](
+          repository, pluginName);
+
+      if (pluginUrl === false) {
+        HHM.log.debug(`Repository handler ${repository.type} returned false `
+          + `for plugin ${pluginName}`);
+        continue;
+      }
+
+      HHM.log.debug(`Trying to load plugin ${pluginName} from ` +
+        `${repository.type} repository: ${pluginUrl}`);
 
       await this._loadPlugin(pluginUrl, pluginName);
 
@@ -174,6 +272,15 @@ module.exports = class PluginLoader {
     return -1;
   }
 
+  /**
+   * Tries to load a plugin from the given URL.
+   *
+   * @function PluginLoader#tryToLoadPluginByUrl
+   * @param {string} url Plugin must be served as plain text at this URL.
+   * @param {string} [pluginName] Optional default plugin name, which may be
+   *  overwritten by the plugin code.
+   * @returns {number} The ID of the plugin or -1 if it couldn't be loaded.
+   */
   async tryToLoadPluginByUrl(url, pluginName) {
     let pluginId = -1;
 
@@ -189,4 +296,6 @@ module.exports = class PluginLoader {
 
     return pluginId;
   }
-};
+}
+
+module.exports = PluginLoader;

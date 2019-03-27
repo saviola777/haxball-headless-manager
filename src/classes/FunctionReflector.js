@@ -1,10 +1,18 @@
-/**
- * TODO documentation
- */
-
 const functionReflector = require('js-function-reflector');
 
-module.exports = class FunctionReflector {
+/**
+ * Wrapper class around the js-function-reflector library.
+ *
+ * @property {number} hashSeed Seed for murmur hashing, positive integer.
+ * @property {Map.<number, Object.<String, *>>} functionMap Maps hashes to
+ *  parsed functions, this acts as a cache to avoid parsing the same functions
+ *  over and over.
+ *
+ * @class FunctionReflector
+ *
+ * @see https://github.com/arrizalamin/js-function-reflector
+ */
+class FunctionReflector {
   constructor(hashSeed) {
     this._class = `FunctionReflector`;
     this.hashSeed = hashSeed;
@@ -12,10 +20,21 @@ module.exports = class FunctionReflector {
   }
 
   /**
-   * TODO documentation
+   * Returns the result of parsing the given function.
+   *
+   * @function FunctionReflector#forFunction
+   * @param {(Function|string)} func Function to be parsed.
+   * @param {Object.<String, *>} [scope] A scope in which to parse the function.
+   *  Currently not fully supported, since the parsed result is stored using the
+   *  hash of the function regardless of the scope -- it works if you make sure
+   *  to pass the correct scope the first time and if the scope never changes.
+   * @returns {Object.<String, *>} The parsed function, see the
+   *  js-function-reflector documentation for more information on the structure
+   *  of this object.
    */
   forFunction(func, scope) {
-    const hash = murmurhash3_32_gc(func.toString(), this.hashSeed);
+    const hash = murmurhash3_32_gc(
+        typeof func === `function` ? func.toString() : func, this.hashSeed);
 
     if (!this.functionMap.has(hash)) {
       this.functionMap.set(hash, functionReflector(func, scope));
@@ -25,9 +44,25 @@ module.exports = class FunctionReflector {
   }
 
   /**
-   * TODO documentation
+   * Returns the 0-based position of the last argument of the given function, if
+   * the argument is destructuring and there is no value for the argument in the
+   * given `args` array.
+   *
+   * This is used to dynamically check if a function (e.g., event handler)
+   * expects a destructuring argument to be injected (e.g., metadata).
+   *
+   * Note that you may have to fill the args array with `undefined` entries up
+   * to the injection point.
+   *
+   * @function FunctionReflector#getArgumentInjectionPosition
+   * @param {(Function|string)} func The function to be inspected.
+   * @param {Array} args Arguments to the function, used to determine if there
+   *  are arguments missing (i.e. if the function expects more parameters than
+   *  were given).
+   * @returns {number} 0-based position of the last argument if the function
+   *  seems to expect argument injection, or -1 otherwise.
    */
-  getDestructuringArgPosition(func, args) {
+  getArgumentInjectionPosition(func, args) {
     const params = this.forFunction(func).params;
     const numParams = params.length;
 
@@ -43,9 +78,10 @@ module.exports = class FunctionReflector {
   }
 };
 
-/**
+/***
  * JS Implementation of MurmurHash3 (r136) (as of May 20, 2011)
  *
+ * @function external:murmurhash3_32_gc
  * @author <a href="mailto:gary.court@gmail.com">Gary Court</a>
  * @see http://github.com/garycourt/murmurhash-js
  * @author <a href="mailto:aappleby@gmail.com">Austin Appleby</a>
@@ -53,9 +89,10 @@ module.exports = class FunctionReflector {
  *
  * @param {string} key ASCII only
  * @param {number} seed Positive integer only
- * @return {number} 32-bit positive integer hash
+ * @returns {number} 32-bit positive integer hash
+ *
+ * TODO export in HHM namespace?
  */
-
 function murmurhash3_32_gc(key, seed) {
   var remainder, bytes, h1, h1b, c1, c1b, c2, c2b, k1, i;
 
@@ -107,3 +144,5 @@ function murmurhash3_32_gc(key, seed) {
 
   return h1 >>> 0;
 }
+
+module.exports = FunctionReflector;

@@ -1,30 +1,64 @@
 /**
- * Plugin which adds HHM features to the Haxball room object.
+ * Extends the `RoomObject` provided by the native Haxball API.
  *
- * TODO move non-specific functions to manager
+ * @namespace HhmRoomObject
+ * @extends external:native-api.RoomObject
  */
 
-/**
+/***
  * Extends the given room with HHM features.
  */
 module.exports.createRoom = function(room, pluginManager) {
-  room.sendChatNative = room.sendChat || Function.prototype;
+
+  // Copy room because we have to re-use the given instance
+  const parentRoom = Object.assign({}, room);
 
   return $.extend(room, {
+    _class: `HhmRoomObject`,
+
+    /**
+     * Maps plugin IDs to trapped room instances.
+     *
+     * @member {Object.<Number, external:haxball-room-trapper.TrappedRoom>}
+     *  HhmRoomObject._plugins
+     */
     _plugins: {},
+
+    /**
+     * `Array` of disabled plugin IDs.
+     *
+     * @member {Array.<Number>} HhmRoomObject._pluginsDisabled
+     */
     _pluginsDisabled: [],
+
+    /**
+     * Maps plugin names to plugin IDs.
+     *
+     * @member {Object.<String, Number>} HhmRoomObject._pluginIds
+     */
     _pluginIds: {},
+
+    /**
+     * Associated plugin manager.
+     *
+     * @member {PluginManager} HhmRoomObject._pluginManager
+     */
     _pluginManager: pluginManager,
   }, {
 
     /**
-     * Add an event state validator function for the given handler name.
+     * Add an event state validator function for the given handler names.
      *
-     * @see TrappedRoomManager#addEventStateValidator
+     * @memberOf HhmRoomObject
+     * @instance
+     * @param {(string|Array.<string>)} handlerNames Event handler names.
+     * @param {Function} validator Validator function.
+     * @returns {HhmRoomObject} Fluent interface.
+     * @see TrappedRoomManager.addEventStateValidator
      */
-    addEventStateValidator: function(handlerName, validator) {
-      this.getPluginManager().getRoomManager()
-          .addEventStateValidator(this._id, handlerName, validator);
+    addEventStateValidator: function(handlerNames, validator) {
+      pluginManager.getRoomManager()
+          .addEventStateValidator(this._id, handlerNames, validator);
 
       return this;
     },
@@ -33,10 +67,15 @@ module.exports.createRoom = function(room, pluginManager) {
      * Add a hook for the given handler name that is executed before plugin
      * event handlers.
      *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @param {(string|Array.<string>)} handlerName Event handler name(s).
+     * @param {Function} hook Hook function.
+     * @returns {HhmRoomObject} Fluent interface.
      * @see TrappedRoomManager#addPreEventHandlerHook
      */
     addPreEventHandlerHook: function(handlerName, hook) {
-      this.getPluginManager().getRoomManager()
+      pluginManager.getRoomManager()
           .addPreEventHandlerHook(this._id, handlerName, hook);
 
       return this;
@@ -46,10 +85,15 @@ module.exports.createRoom = function(room, pluginManager) {
      * Add a hook for the given handler name that is executed after plugin
      * event handlers.
      *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @param {string} handlerName Event handler name.
+     * @param {Function} hook Hook function.
+     * @returns {HhmRoomObject} Fluent interface.
      * @see TrappedRoomManager#addPostEventHandlerHook
      */
     addPostEventHandlerHook: function(handlerName, hook) {
-      this.getPluginManager().getRoomManager()
+      pluginManager.getRoomManager()
           .addPostEventHandlerHook(this._id, handlerName, hook);
 
       return this;
@@ -64,10 +108,17 @@ module.exports.createRoom = function(room, pluginManager) {
      * If you try to pass a non-function and the room already had an attribute
      * with the same name, the extension will fail and false will be returned.
      *
-     * The plugin room and previously defined function (if any) are passed as
-     * ...args arguments.
+     * The plugin room and previously defined function (if any) are passed in
+     * a destructuring first argument.
      *
-     * @returns boolean true if the extension was successful, false if not
+     * @memberOf HhmRoomObject
+     * @instance
+     * @param {string} name Name of the room property that is being added or
+     *  extended.
+     * @param {(Function|*)} element New value for the given property, either a
+     *  `Function` (extension will never fail) or any other type (extension will
+     *  fail if property exists).
+     * @returns {boolean} `true` if the extension was successful, `false` if not
      */
     extend: function(name, element) {
 
@@ -79,7 +130,7 @@ module.exports.createRoom = function(room, pluginManager) {
         const definingPlugin = this;
 
         room[name] = function(...args) {
-          if (this.isEnabled() && this.isLoaded()) {
+          if (definingPlugin.isEnabled()) {
             return element({
               previousFunction: previousFn,
               callingPluginName: this._name,
@@ -102,13 +153,55 @@ module.exports.createRoom = function(room, pluginManager) {
 
     /**
      * Returns the handler names specific to this plugin.
+     *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @returns {Array.<string>} Handler names for this plugin.
+     * @see TrappedRoomManager#getEventHandlerNames
      */
     getHandlerNames: function() {
       return pluginManager.getRoomManager().getEventHandlerNames(room, this._id);
     },
 
     /**
+     * Returns the plugin ID.
+     *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @returns {number} Plugin ID.
+     */
+    getId: function() {
+      return this._id;
+    },
+
+    /**
+     * Returns the name of the plugin, or the ID if the plugin has no name.
+     *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @returns {string} Plugin name or ID (as a `string`) if the plugin has no
+     *  name.
+     */
+    getName: function() {
+      return this._name;
+    },
+
+    /**
+     * Returns the parent room object.
+     *
+     * @memberOf HhmRoomObject
+     * @returns {external:native-api.RoomObject} Parent room object, in most
+     *  cases this is the native headless API room object.
+     */
+    getParentRoom() {
+      return parentRoom;
+    },
+
+    /**
      * Returns the associated plugin manager.
+     *
+     * @memberOf HhmRoomObject
+     * @returns {PluginManager} Associated plugin manager.
      */
     getPluginManager: function() {
       return pluginManager;
@@ -117,101 +210,144 @@ module.exports.createRoom = function(room, pluginManager) {
     /**
      * Returns the trapped room for the given plugin.
      *
-     * @param pluginName Name of the plugin or undefined to create new plugin
-     * @param create True if a new plugin should be created if it does not exist
-     *
-     * TODO move to PluginManager
+     * @memberOf HhmRoomObject
+     * @param {string} [pluginName] Name of the plugin or undefined to create
+     *  new plugin.
+     * @param {boolean} [create] `true` if a new plugin should be created if it
+     *  does not exist. If no `pluginName` was given, this parameter is ignored
+     *  and a new plugin is created.
+     * @returns {(external:haxball-room-trapper.TrappedRoom|undefined)} Plugin
+     *  room proxy or undefined if the plugin was not found and `create` is
+     *  `false`.
+     * @see PluginManager#getPluginByName
      */
     getPlugin: function(pluginName, create) {
-      create = create || false;
-      let pluginRoom = {};
-      const hasPlugin = this.hasPlugin(pluginName);
-
-      if (pluginName === undefined || (create && !hasPlugin)) {
-        const id = String(Date.now());
-        room._plugins[id] = pluginManager.roomTrapper.createTrappedRoom(room, id);
-        room._plugins[id]._id = room._plugins[id]._name = id;
-        room._plugins[id]._lifecycle = { accessed: false, loaded: false };
-        pluginRoom = room._plugins[id];
-
-        if (pluginName !== undefined) {
-          room._pluginIds[pluginName] = id;
-          room._plugins[id]._name = pluginName;
-        }
-      } else if (hasPlugin) {
-        pluginRoom = room._plugins[room._pluginIds[pluginName]];
-      } else {
-        HHM.log.error(`Plugin not found: ${pluginName}, please call hasPlugin first`);
-      }
-
-      return pluginRoom;
+      return pluginManager.getPluginByName(pluginName, create);
     },
 
     /**
      * Returns the configuration of this plugin.
+     *
+     * If no parameter name is given, the whole config object is returned.
+     *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @param {string} [paramName] Configuration parameter name. If `undefined`,
+     *  complete config is returned.
+     * @returns {(Object|undefined|*)} Configuration object or value of the
+     *  given configuration parameter or `undefined` if no such configuration
+     *  parameter exists.
      */
-    getPluginConfig: function() {
+    getConfig: function(paramName) {
       const pluginSpec = this.getPluginSpec();
 
-      if (pluginSpec.hasOwnProperty(`config`)) {
-        return pluginSpec.config;
+      if (!pluginSpec.hasOwnProperty(`config`)) {
+        pluginSpec.config = {};
       }
 
-      return {};
+      return paramName === undefined ? pluginSpec.config :
+          pluginSpec.config[paramName];
     },
 
     /**
      * Returns the plugin specification for this plugin.
+     *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @returns {external:haxball-room-trapper.TrappedRoom.pluginSpec} Plugin
+     *  specification.
      */
     getPluginSpec: function() {
-      if (this.hasOwnProperty(`pluginSpec`)) {
-        return this.pluginSpec;
+      if (!this.hasOwnProperty(`pluginSpec`)) {
+        this.pluginSpec = {};
       }
 
-      return {};
+      return this.pluginSpec;
     },
 
     /**
      * Returns the property names specific to this plugin.
+     *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @returns {Array.<string>} Plugin-specific property names.
+     * @see TrappedRoomManager#getPropertyNames
      */
     getPropertyNames: function() {
       return pluginManager.getRoomManager().getPropertyNames(room, this._id);
     },
 
     /**
-     * Returns whether this plugin has a name.
+     * Returns the plugin source code.
+     *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @returns {string} Plugin source code.
      */
-    hasName: function() {
-      return this._name !== undefined && this._id !== this._name;
+    getSourceCode: function() {
+      return this._source;
     },
 
     /**
-     * Returns whether the given plugin is loaded.
+     * Returns whether this plugin has a name.
+     *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @returns {boolean} Whether the plugin has a name.
+     */
+    hasName: function() {
+      return this._name !== undefined && String(this._id) !== this._name;
+    },
+
+    /**
+     * Returns whether a valid plugin with the given name exists.
+     *
+     * @see PluginManager#hasPluginById
+     * @memberOf HhmRoomObject
+     * @returns {boolean} Whether a valid plugin with the given name exists.
      */
     hasPlugin: function(pluginName) {
-      return room._pluginManager.hasPluginById(
-          room._pluginManager.getPluginId(pluginName));
+      return pluginManager.hasPluginByName(pluginName);
     },
 
     /**
      * Returns whether the plugin has been fully loaded.
      *
      * A plugin is loaded when all of its dependencies have been loaded and its
-     * onRoomLink handler has been executed.
+     * `onRoomLink` handler has been executed.
+     *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @returns {boolean} Whether the plugin has been fully loaded.
      */
     isLoaded: function() {
-      return this._lifecycle.loaded || false;
+      return (this._lifecycle !== undefined && this._lifecycle.loaded) || false;
     },
 
     /**
      * Returns whether this plugin is enabled.
+     *
+     * A plugin can only be enabled once it has been fully loaded.
+     *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @returns {boolean} Whether this plugin is enabled.
      */
     isEnabled: function() {
-      return room._pluginManager.isPluginEnabled(this._id);
+      return this.isLoaded()
+          && pluginManager.room._pluginsDisabled.indexOf(this._id) === -1;
     },
 
     /**
-     * TODO documentation
+     * Convenience logging function which will include the plugin name.
+     *
+     * Will not log to the room, but only to the browser console.
+     *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @param {string} message Message to be logged.
+     * @param {string} level Log level.
+     * @see module:src/log
      */
     log: function(message, level = HHM.log.level.INFO) {
       level = HHM.log.hasOwnProperty(level) ? level : HHM.log.level.INFO;
@@ -221,7 +357,30 @@ module.exports.createRoom = function(room, pluginManager) {
     },
 
     /**
+     * Sets the given configuration parameter to the given value.
+     *
+     * If no parameter name was given, an event will be triggered that the
+     * configuration was changed.
+     *
+     * If an object is passed as the paramName, the whole config will be
+     * overwritten and an event will be triggered.
+     *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @param {string} [paramName] Name of the configuration parameter.
+     * @param {*} [value] New value of the configuration parameter.
+     * @see PluginManager#setPluginConfig
+     */
+    setConfig: function(paramName, value) {
+      return pluginManager.setPluginConfig(this._id, paramName, value);
+    },
+
+    /**
      * Sets a new name for this plugin.
+     *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @param {string} name New plugin name.
      */
     setName: function(name) {
       this._name = name;
@@ -230,21 +389,16 @@ module.exports.createRoom = function(room, pluginManager) {
     /**
      * Triggers an event with the given name and arguments.
      *
-     * Calling an event handler directly will only execute the current
-     * plugin's event handler, while using this function will trigger all
-     * handlers for the given event. As the event name, the event handler name
-     * minus the "on" has to be specified, e.g. for "onSomeEvent" it should be
-     * "SomeEvent".
-     *
-     * Can also be (ab)used to trigger native events.
+     * @memberOf HhmRoomObject
+     * @param {string} eventHandlerName Name of the event handler to be
+     *  triggered.
+     * @param {...*} args Event arguments.
+     * @returns {boolean} `false` if one of the event handlers returned `false`,
+     *  `true` otherwise.
+     * @see PluginManager#triggerEvent
      */
-    triggerEvent: function(eventName, ...args) {
-      const eventHandler = `on${eventName}`;
-      if (room.hasOwnProperty(eventHandler)) {
-        return room[eventHandler](...args);
-      }
-
-      return true;
+    triggerEvent: function(eventHandlerName, ...args) {
+      return pluginManager.triggerEvent(eventHandlerName, ...args);
     },
   });
 };

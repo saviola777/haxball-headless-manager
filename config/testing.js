@@ -16,8 +16,8 @@ HHM.config.room = {
   maxPlayers: haxroomie.maxPlayers || 16,
   public : haxroomie.hasOwnProperty('public') ? haxroomie.public : false,
   password: haxroomie.password,
-  geo: haxroomie.geo || {code: `FI`, lat: 60.192059, lon: 24.945831},
-  token: haxroomie.token,
+  geo: haxroomie.geo || { code: `FI`, lat: 60.192059, lon: 24.945831 },
+  token: haxroomie.token || "insert your token here",
 };
 
  HHM.config.postInit = HBInit => {
@@ -27,17 +27,18 @@ HHM.config.room = {
     room.setDefaultStadium(`Big`);
     room.setScoreLimit(0);
     room.setTimeLimit(7);
-  }
+  };
 };
 
 HHM.config.plugins = {
   'sav/roles': {
     roles: {
-      'host': ``,
+      'host': `host`,
       'admin': haxroomie.adminPassword || 'haxroomie'
     },
   },
   'sav/core': {},
+  'sav/plugin-control': {},
 };
 
 HHM.config.repositories = [
@@ -46,6 +47,10 @@ HHM.config.repositories = [
   },
   {
     url: `${HHM.baseUrl}plugins/fm/`,
+  },
+  {
+    type: `github`,
+    repository: `saviola777/hhm-plugins`
   },
 ];
 

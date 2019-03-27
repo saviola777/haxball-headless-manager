@@ -1,0 +1,62 @@
+{
+    "plugins": [
+        "plugins/markdown",
+        "plugins/summarize"
+    ],
+    "recurseDepth": 10,
+    "source": {
+        "include": ["package.json", "JSDOC.md"],
+        "includePattern": ".+\\.js(doc|x)?$",
+        "excludePattern": "(^|\\/|\\\\)_"
+    },
+    "sourceType": "module",
+    "tags": {
+        "allowUnknownTags": true,
+        "dictionaries": ["jsdoc", "closure"]
+    },
+    "templates": {
+        "cleverLinks": false,
+        "monospaceLinks": false,
+        "systemName"            : "Haxball Headless Manager",
+        "systemSummary"         : "Suite of management scripts for headless haxball hosts, including plugins with dependency management",
+        "systemLogo"            : "",
+        "systemColor"           : "",
+        "footer"                : "",
+        "copyright"             : "",
+        "includeDate"           : true,
+        "dateFormat"            : "YYYY-MM-DD HH:mm:ss",
+        "inlineNav"             : false,
+        "inverseNav"            : true,
+        "navMembers"            : [
+            {"kind": "class", "title": "Classes", "summary": "All documented classes."},
+            {"kind": "external", "title": "Externals", "summary": "All documented external members."},
+            {"kind": "global", "title": "Globals", "summary": "All documented globals."},
+            {"kind": "mixin", "title": "Mixins", "summary": "All documented mixins."},
+            {"kind": "interface", "title": "Interfaces", "summary": "All documented interfaces."},
+            {"kind": "module", "title": "Modules", "summary": "All documented modules."},
+            {"kind": "namespace", "title": "Namespaces", "summary": "All documented namespaces."},
+            {"kind": "tutorial", "title": "Tutorials", "summary": "All available tutorials."}
+        ],
+        "linenums"              : true,
+        "showTableOfContents"   : true,
+        "showAccessFilter"      : true,
+        "analytics"             : "",
+        "collapseSymbols"       : true,
+        "methodHeadingReturns"  : true,
+        "outputSourceFiles"     : true,
+        "outputSourcePath"      : true,
+        "sort"                  : "linenum, longname, version, since",
+        "search"                : true,
+        "favicon"               : "",
+        "stylesheets"           : [],
+        "scripts"               : []
+    },
+    "opts": {
+        "destination": "./jsdoc/",
+        "encoding": "utf8",
+        "private": true,
+        "recurse": true,
+        "template": "./node_modules/foodoc/template",
+        "tutorials": "./doc"
+    }
+}

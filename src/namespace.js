@@ -1,20 +1,66 @@
 /**
- * TODO documentation
- * Populates the HHM namespace
+ * HHM namespace, containing all globally visible components of the system.
+ *
+ * @namespace HHM
  */
+
 
 module.exports.populate = () => {
   global.HHM = global.HHM || {};
-  global.HHM.version = `0.9.0-git`;
+
+  /**
+   * Current HHM version.
+   *
+   * @member HHM.version
+   */
+  global.HHM.version = `0.9.1-git`;
+
+  /**
+   * Default base URL, can be overridden in the configuration file.
+   *
+   * The base URL is used to load the HHM and core plugins. Mainly useful during
+   * development when switching between stable and development versions of the
+   * HHM and its plugins.
+   *
+   * @member HHM.baseUrl
+   */
   global.HHM.baseUrl = HHM.baseUrl || `https://haxplugins.tk/`;
+
+  /**
+   * URL for the CORS proxy.
+   *
+   * This is used to allow plugins to be loaded from external sources which
+   * are not configured for CORS. Make sure there is a CORS Anywhere reverse
+   * proxy running at this URL or plugin loading will not work.
+   *
+   * @see https://github.com/Rob--W/cors-anywhere
+   * @member HHM.proxyUrl
+   */
   global.HHM.proxyUrl = HHM.proxyUrl || `https://haxplugins.tk/proxy/`;
-  global.HHM.defaultConfigUrl = `${HHM.baseUrl}config/default.js`;
+
+  /**
+   * Logger.
+   *
+   * @see module:src/log
+   * @member HHM.log
+   */
   global.HHM.log = require(`./log`)();
 
-  // Stores global deferreds
+  /**
+   * Stores global deferreds.
+   *
+   * These are JQuery deferred objects.
+   *
+   * @see https://api.jquery.com/category/deferred-object/
+   * @member HHM.deferreds
+   */
   global.HHM.deferreds = {};
 
-  // Classes
+  /**
+   * Provides access to all classes of the HHM.
+   *
+   * @member HHM.classes
+   */
   global.HHM.classes = {
     EventHandlerExecutionMetadata: require(`./classes/EventHandlerExecutionMetadata`),
     FunctionReflector: require(`./classes/FunctionReflector`),
@@ -23,88 +69,141 @@ module.exports.populate = () => {
     TrappedRoomManager: require(`./classes/TrappedRoomManager`),
   };
 
-  /**
-   * HHM events, the type will be passed along with each event.
-   */
+
   // TODO move to separate file?
+  // TODO move to wiki and remove
+  /**
+   * HHM events, the event name will be passed along with each event in addition
+   * to the event data listed as "Properties" below.
+   *
+   * @property {string} eventName Name of the event.
+   *
+   * @namespace HHM.events
+   */
   global.HHM.events = {
-    /**
-     * Any other event that does not (yet) have an event type.
-     */
-    'OTHER': `other`,
-
-    /**
-     * Triggered when a plugin was disabled.
-     *
-     * Event data:
-     *  - plugin: the disabled plugin
-     */
-    'PLUGIN_DISABLED': `pluginDisabled`,
-
-    /**
-     * Triggered when a plugin was enabled.
-     *
-     * Event data:
-     *  - plugin: the enabled plugin
-     */
-    'PLUGIN_ENABLED': `pluginEnabled`,
-
-    /**
-     * Triggered when a plugin was loaded.
-     *
-     * Triggered after the onRoomLink function for the given plugin has been
-     * called.
-     *
-     * Event data:
-     *  - plugin: the loaded plugin
-     */
-    'PLUGIN_LOADED': `pluginLoaded`,
-
-    /**
-     * Triggered when a plugin is removed.
-     *
-     * Event data:
-     *  - plugin: the removed plugin
-     */
-    'PLUGIN_REMOVED': `pluginRemoved`,
-
     /**
      * Triggered when an event handler was set.
      *
-     * Event data:
-     *  - plugin: associated plugin
-     *  - handlerName: name of the event handler
-     *  - handlerFunction: handler function
+     * @property {Object} plugin Associated plugin.
+     * @property {string} handlerName Name of the event handler.
+     * @property {Function} handlerFunction Handler function.
+     *
+     * @memberOf HHM.events
      */
-    'EVENT_HANDLER_SET': 'eventHandlerSet',
+    'EVENT_HANDLER_SET': `eventHandlerSet`,
 
     /**
      * Triggered when an event handler was unset.
      *
-     * Event data:
-     *  - plugin: associated plugin
-     *  - handlerName: name of the event handler
+     * @property {Object} plugin Associated plugin.
+     * @property {string} handlerName Name of the event handler.
      */
-    'EVENT_HANDLER_UNSET': 'eventHandlerUnset',
+    'EVENT_HANDLER_UNSET': `eventHandlerUnset`,
 
     /**
-     * Triggered when a plugin property was unset.
+     * Triggered before a local event is dispatched.
      *
-     * Event data:
-     *  - plugin: associated plugin
-     *  - propertyName: name of the property that was set
-     *  - propertyValue: value the property was set to
-     *  - propertyValueOld: previous value of the property or undefined
+     * Local events are only executed on one plugin. Currently known local
+     * event types:
+     *
+     *  - roomLink
+     *  - enable
+     *  - disable
+     *  - configSet
+     *
+     * TODO trigger events
+     *
+     * @property {Object} plugin Associated plugin.
+     * @property {string} localEventName Name of the local event, see the list
+     *  above.
+     * @property {Array} localEventArgs Arguments to the local event, if any.
+     *
+     * @memberOf HHM.events
      */
-    'PROPERTY_SET': 'propertyUnset',
+    'LOCAL_EVENT': `localEvent`,
 
     /**
-     * Triggered when a plugin property was unset.
+     * Any other event that does not (yet) have an event type.
      *
-     * Event data:
-     *  - plugin: associated plugin
-     *  - propertyName: name of the property that was unset
+     * @property {Array} eventArgs Arguments to the event, if any.
+     *
+     * @memberOf HHM.events
      */
-    'PROPERTY_UNSET': 'propertyUnset',
+    'OTHER': `other`,
+
+    /**
+     * Triggered after a plugin was disabled.
+     *
+     * @property {Object} plugin The disabled plugin.
+     *
+     * @memberOf HHM.events
+     */
+    'PLUGIN_DISABLED': `pluginDisabled`,
+
+    /**
+     * Triggered after a plugin was enabled.
+     *
+     * @property {Object} plugin The enabled plugin.
+     *
+     * @memberOf HHM.events
+     */
+    'PLUGIN_ENABLED': `pluginEnabled`,
+
+    /**
+     * Triggered before a plugin is loaded.
+     *
+     * Triggered after the onRoomLink function for the given plugin has been
+     * called but before the plugin has been marked as loaded.
+     *
+     * @property {Object} plugin The loaded plugin.
+     *
+     * @memberOf HHM.events
+     */
+    'BEFORE_PLUGIN_LOADED': `beforePluginLoaded`,
+
+    /**
+     * Triggered after a plugin was loaded.
+     *
+     * Triggered after the onRoomLink function for the given plugin has been
+     * called and the plugin has been marked as loaded.
+     *
+     * @property {Object} plugin The loaded plugin.
+     *
+     * @memberOf HHM.events
+     */
+    'PLUGIN_LOADED': `pluginLoaded`,
+
+    /**
+     * Triggered after a plugin was removed.
+     *
+     * @property {Object} plugin The removed plugin.
+     *
+     * @memberOf HHM.events
+     */
+    'PLUGIN_REMOVED': `pluginRemoved`,
+
+    /**
+     * Triggered after a plugin property was set.
+     *
+     * @property {Object} plugin Associated plugin.
+     * @property {string} propertyName  Name of the property that was set.
+     * @property {*} propertyValue Value the property was set to.
+     * @property {*} propertyValueOld Previous value of the property or
+     *  undefined.
+     *
+     * @memberOf HHM.events
+     */
+    'PROPERTY_SET': `propertySet`,
+
+    /**
+     * Triggered after a plugin property was unset.
+     *
+     * @property {Object} plugin Associated plugin.
+     * @property {string} propertyName Name of the property that was unset.
+     * @property {*} propertyValue Value of the property that was unset.
+     *
+     * @memberOf HHM.events
+     */
+    'PROPERTY_UNSET': `propertyUnset`,
   }
 };

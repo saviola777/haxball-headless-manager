@@ -11,7 +11,7 @@ Useful links:
 * [hhm-plugins](https://github.com/saviola777/hhm-plugins): Main plugin
   repository. Check it out to see which plugins already exist and how to use
   them.
-* [HHM wiki](https://github.com/saviola777/haxball-headless-manager/wiki):
+* [HHM API documentation](https://haxplugins.tk/docs):
   Contains detailed information on how to write plugins, how to interact with
   the HHM core system and about the structure of the HHM itself. Please check
   it out before asking questions, thanks! 
@@ -20,14 +20,12 @@ Useful links:
 # <a name="getting_started"></a> Getting started
 
 This first part is for users, it shows how to set up and configure the HMM,
-while the later part, [writing & publishing plugins](#writing), is meant for
-developers wanting to write plugins for the HHM.
+plugin developers will want to check out the API documentation.
 
 ## Preparing your configuration
 
-To get started using the HHM, you first need to prepare your config (unless you want
-to use the manual configuration and load your plugins later, then you can skip
-to [Loading the HHM](#loading)). Take a look at the
+To get started using the HHM, you first need to prepare your config. Take a
+look at the
 [default configuration](./config/default.js) and change it to your liking.
 
 
@@ -43,6 +41,8 @@ The following configuration directives are available currently:
 * `HHM.config.repositories`: A list of strings (URLs) or objects containing a
     `url` and (optionally) a `prefix`, see the example file linked above
 
+Make sure to read the example config file, it has detailed explanations of each
+configuration directive.
  
 If you have uploaded your config somewhere, simply paste the following line in the dev console (insert the link to your config):
 
@@ -54,6 +54,53 @@ Alternatively, paste your config into the dev console.
 
 If you have used the abovementioned template, you are done! The HHM should
 automatically be loaded alongside your configuration.
+
+# Creating your own plugin repository
+
+There are currently three ways to deploy your own plugin repository:
+
+* using a webserver to directly serve the plugins
+* using a GitHub repository
+* using a custom web app to serve the plugins
+
+The first two will be described here, the last one is an advanced variant of the
+first.
+
+## Using a webserver
+
+Assuming your domain is `yourdomain.tld` and you put the plugin
+`author/plugin-name` so that it can be accessed at the URL
+`https://yourdomain.tld/plugins/author/plugin-name.js`, your repository entry
+would look like this:
+
+```javascript
+{
+  type: `plain`, // optional, this is the default value
+  url: `https://yourdomain.tld/plugins/`,
+  suffix: `.js`, // optional, this is the default value
+}
+```
+
+## Using a GitHub repository
+
+When it comes to a GitHub repository there are three things you need to know:
+the repository name (i.e. user + repository), the path within the repository
+where the plugins are stored, and the branch of the repository you want to use.
+
+Assuming your repository is accessible at `https://github.com/XHerna/fm-publicbot`
+and your plugins are stored in the directory `plugins` in the repository, and
+you want to use the master branch (i.e., the plugin `fm/team-fill` would
+be available at `https://github.com/XHerna/fm-publicbot/blob/master/plugins/fm/team-fill.js`), the entry would look like this:
+
+```javascript
+{
+  type: `github`,
+  repository: `XHerna/fm-publicbot`,
+  path: `plugins`, // optional, defaults to `src`
+  branch: `master`, // optional, this is the default value
+  suffix: `.js`, // optional, this is the default value
+}
+```
 
 # Building the HHM
 

@@ -5,6 +5,7 @@ package-lock.json
 
 .*
 /dist/
+/jsdoc/
 /local/
 /remote
 /remote_stable

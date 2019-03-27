@@ -6,7 +6,7 @@
 # browserify needs to be installed or symlinked, e.g.:
 # npm install browserify && ln -s `pwd`/node_modules/browserify/bin/cmd.js ~/bin/browserify
 all: build
-build: prepare_build
+build: prepare_build jsdoc
 	@echo "Running browserify..."
 	browserify index.js -o dist/hhm.js -d
 deploy: build
@@ -19,7 +19,14 @@ deploy_stable: build
 	cp dist/*.js remote_stable/
 	cp config/*.js remote_stable/config/
 	rsync -r -t -p -v -L --progress --delete -u plugins/hhm-plugins/ remote_stable/plugins/hhm-plugins/
+deploy_jsdoc: jsdoc
+	rsync -r -t -p -v --progress --delete --size-only -u jsdoc/ remote_stable/docs/
 prepare_build:
 	@echo "Preparing dist directory..."
 	mkdir -p dist/
 	rm -rf dist/*
+jsdoc:
+	@echo "Compiling JSDoc"
+	mkdir -p /tmp/jsdoc
+	ln -sf /tmp/jsdoc jsdoc
+	./node_modules/.bin/jsdoc src -c jsdoc.json
