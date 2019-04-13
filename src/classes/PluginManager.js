@@ -565,7 +565,7 @@ class PluginManager {
     // Check if other plugins depend on this one
     if (this.isPluginRequired(pluginId)) {
       HHM.log.warn(`Can't disable plugin ${plugin.getName()}`);
-      HHM.log.warn(this._createDependencyChain(plugin.getName(), []));
+      HHM.log.warn(this._createDependencyChain(plugin.getId(), []));
       return false;
     }
 
