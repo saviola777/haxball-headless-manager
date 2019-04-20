@@ -37,7 +37,7 @@ HHM.config.room = {
  * You can also pass the code as a string instead of a function.
  */
 HHM.config.postInit = HBInit => {
-  let room = HBInit();
+  var room = HBInit();
 
   room.onRoomLink = () => {
     room.setDefaultStadium(`Big`);

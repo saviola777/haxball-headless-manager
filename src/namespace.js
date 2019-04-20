@@ -71,7 +71,6 @@ module.exports.populate = () => {
 
 
   // TODO move to separate file?
-  // TODO move to wiki and remove
   /**
    * HHM events, the event name will be passed along with each event in addition
    * to the event data listed as "Properties" below.
@@ -84,7 +83,7 @@ module.exports.populate = () => {
     /**
      * Triggered when an event handler was set.
      *
-     * @property {Object} plugin Associated plugin.
+     * @property {HhmRoomObject} plugin Associated plugin.
      * @property {string} handlerName Name of the event handler.
      * @property {Function} handlerFunction Handler function.
      *
@@ -95,8 +94,9 @@ module.exports.populate = () => {
     /**
      * Triggered when an event handler was unset.
      *
-     * @property {Object} plugin Associated plugin.
+     * @property {HhmRoomObject} plugin Associated plugin.
      * @property {string} handlerName Name of the event handler.
+     * @property {Function} handlerFunction Previously set handler function.
      */
     'EVENT_HANDLER_UNSET': `eventHandlerUnset`,
 
@@ -111,9 +111,7 @@ module.exports.populate = () => {
      *  - disable
      *  - configSet
      *
-     * TODO trigger events
-     *
-     * @property {Object} plugin Associated plugin.
+     * @property {HhmRoomObject} plugin Associated plugin.
      * @property {string} localEventName Name of the local event, see the list
      *  above.
      * @property {Array} localEventArgs Arguments to the local event, if any.
@@ -134,7 +132,7 @@ module.exports.populate = () => {
     /**
      * Triggered after a plugin was disabled.
      *
-     * @property {Object} plugin The disabled plugin.
+     * @property {HhmRoomObject} plugin The disabled plugin.
      *
      * @memberOf HHM.events
      */
@@ -143,7 +141,7 @@ module.exports.populate = () => {
     /**
      * Triggered after a plugin was enabled.
      *
-     * @property {Object} plugin The enabled plugin.
+     * @property {HhmRoomObject} plugin The enabled plugin.
      *
      * @memberOf HHM.events
      */
@@ -155,7 +153,7 @@ module.exports.populate = () => {
      * Triggered after the onRoomLink function for the given plugin has been
      * called but before the plugin has been marked as loaded.
      *
-     * @property {Object} plugin The loaded plugin.
+     * @property {HhmRoomObject} plugin The loaded plugin.
      *
      * @memberOf HHM.events
      */
@@ -167,7 +165,7 @@ module.exports.populate = () => {
      * Triggered after the onRoomLink function for the given plugin has been
      * called and the plugin has been marked as loaded.
      *
-     * @property {Object} plugin The loaded plugin.
+     * @property {HhmRoomObject} plugin The loaded plugin.
      *
      * @memberOf HHM.events
      */
@@ -176,7 +174,7 @@ module.exports.populate = () => {
     /**
      * Triggered after a plugin was removed.
      *
-     * @property {Object} plugin The removed plugin.
+     * @property {HhmRoomObject} plugin The removed plugin.
      *
      * @memberOf HHM.events
      */
@@ -185,7 +183,7 @@ module.exports.populate = () => {
     /**
      * Triggered after a plugin property was set.
      *
-     * @property {Object} plugin Associated plugin.
+     * @property {HhmRoomObject} plugin Associated plugin.
      * @property {string} propertyName  Name of the property that was set.
      * @property {*} propertyValue Value the property was set to.
      * @property {*} propertyValueOld Previous value of the property or
@@ -198,7 +196,7 @@ module.exports.populate = () => {
     /**
      * Triggered after a plugin property was unset.
      *
-     * @property {Object} plugin Associated plugin.
+     * @property {HhmRoomObject} plugin Associated plugin.
      * @property {string} propertyName Name of the property that was unset.
      * @property {*} propertyValue Value of the property that was unset.
      *

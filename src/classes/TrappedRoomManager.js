@@ -661,8 +661,10 @@ class TrappedRoomManager {
           continue;
         }
 
+        const pluginName = this.room._pluginManager.getPluginName(pluginId);
+
         for (let hook of this.postEventHandlerHooks[handlerName][pluginId]) {
-          hook({ room: this.room, metadata: metadata }, ...args);
+          hook({ room: this.room, metadata: metadata.forPlugin(pluginName) }, ...args);
         }
       }
     }

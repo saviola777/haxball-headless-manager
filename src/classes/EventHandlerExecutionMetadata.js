@@ -72,7 +72,8 @@ class EventHandlerExecutionMetadata {
    * Returns the current overall return value or plugin return value.
    *
    * @function EventHandlerExecutionMetadata#getReturnValue
-   * @param {string} pluginName Name of the plugin.
+   * @param {string} pluginName Name of the plugin for which you want to
+   *  retrieve the registered return values.
    * @returns {(boolean|*)} The overall return value if no parameters are given,
    * otherwise it returns the return value of the first handler for the given
    * plugin or `undefined` if no return values have been registered for the
@@ -145,6 +146,12 @@ class Proxy {
    * Returns the current overall return value or plugin return value.
    *
    * @function EventHandlerExecutionMetadata~Proxy#getReturnValue
+   * @param {string} [pluginName] Name of the plugin for which you want to
+   *  retrieve the registered return values.
+   * @returns {(boolean|*)} The overall return value if no parameters are given,
+   *  otherwise it returns the return value of the first handler for the given
+   *  plugin or `undefined` if no return values have been registered for the
+   *  given plugin.
    * @see EventHandlerExecutionMetadata#getReturnValue
    */
   getReturnValue(pluginName) {

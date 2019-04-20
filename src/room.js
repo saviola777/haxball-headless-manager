@@ -20,28 +20,28 @@ module.exports.createRoom = function(room, pluginManager) {
      * Maps plugin IDs to trapped room instances.
      *
      * @member {Object.<Number, external:haxball-room-trapper.TrappedRoom>}
-     *  HhmRoomObject._plugins
+     *  HhmRoomObject#_plugins
      */
     _plugins: {},
 
     /**
      * `Array` of disabled plugin IDs.
      *
-     * @member {Array.<Number>} HhmRoomObject._pluginsDisabled
+     * @member {Array.<Number>} HhmRoomObject#_pluginsDisabled
      */
     _pluginsDisabled: [],
 
     /**
      * Maps plugin names to plugin IDs.
      *
-     * @member {Object.<String, Number>} HhmRoomObject._pluginIds
+     * @member {Object.<String, Number>} HhmRoomObject#_pluginIds
      */
     _pluginIds: {},
 
     /**
      * Associated plugin manager.
      *
-     * @member {PluginManager} HhmRoomObject._pluginManager
+     * @member {PluginManager} HhmRoomObject#_pluginManager
      */
     _pluginManager: pluginManager,
   }, {
@@ -69,14 +69,14 @@ module.exports.createRoom = function(room, pluginManager) {
      *
      * @memberOf HhmRoomObject
      * @instance
-     * @param {(string|Array.<string>)} handlerName Event handler name(s).
+     * @param {(string|Array.<string>)} handlerNames Event handler name(s).
      * @param {Function} hook Hook function.
      * @returns {HhmRoomObject} Fluent interface.
      * @see TrappedRoomManager#addPreEventHandlerHook
      */
-    addPreEventHandlerHook: function(handlerName, hook) {
+    addPreEventHandlerHook: function(handlerNames, hook) {
       pluginManager.getRoomManager()
-          .addPreEventHandlerHook(this._id, handlerName, hook);
+          .addPreEventHandlerHook(this._id, handlerNames, hook);
 
       return this;
     },
@@ -87,14 +87,14 @@ module.exports.createRoom = function(room, pluginManager) {
      *
      * @memberOf HhmRoomObject
      * @instance
-     * @param {string} handlerName Event handler name.
+     * @param {string} handlerNames Event handler name.
      * @param {Function} hook Hook function.
      * @returns {HhmRoomObject} Fluent interface.
      * @see TrappedRoomManager#addPostEventHandlerHook
      */
-    addPostEventHandlerHook: function(handlerName, hook) {
+    addPostEventHandlerHook: function(handlerNames, hook) {
       pluginManager.getRoomManager()
-          .addPostEventHandlerHook(this._id, handlerName, hook);
+          .addPostEventHandlerHook(this._id, handlerNames, hook);
 
       return this;
     },

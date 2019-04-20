@@ -21,7 +21,7 @@ HHM.config.room = {
 };
 
  HHM.config.postInit = HBInit => {
-  let room = HBInit();
+  var room = HBInit();
 
   room.onRoomLink = () => {
     room.setDefaultStadium(`Big`);
@@ -33,7 +33,7 @@ HHM.config.room = {
 HHM.config.plugins = {
   'sav/roles': {
     roles: {
-      'host': `host`,
+      'host': ``,
       'admin': haxroomie.adminPassword || 'haxroomie'
     },
   },

@@ -35,7 +35,7 @@
             {"kind": "interface", "title": "Interfaces", "summary": "All documented interfaces."},
             {"kind": "module", "title": "Modules", "summary": "All documented modules."},
             {"kind": "namespace", "title": "Namespaces", "summary": "All documented namespaces."},
-            {"kind": "tutorial", "title": "Tutorials", "summary": "All available tutorials."}
+            {"kind": "tutorial", "title": "Guides", "summary": "All available guides."}
         ],
         "linenums"              : true,
         "showTableOfContents"   : true,

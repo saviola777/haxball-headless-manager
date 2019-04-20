@@ -283,7 +283,7 @@ class PluginManager {
 
       const plugin = this.getPluginById(pluginId);
 
-      PluginManager.triggerLocalEvent(plugin, `onEnable`);
+      this.triggerLocalEvent(plugin, `onEnable`);
 
       this.room._pluginsDisabled.splice(pluginIndex, 1);
 
@@ -358,7 +358,7 @@ class PluginManager {
     for (let pluginId of onRoomLinkExecutionOrder) {
       let plugin = this.getPluginById(pluginId);
 
-      PluginManager.triggerLocalEvent(plugin, `onRoomLink`, HHM.roomLink);
+      this.triggerLocalEvent(plugin, `onRoomLink`, HHM.roomLink);
 
       this.triggerHhmEvent( HHM.events.BEFORE_PLUGIN_LOADED, {
         plugin: plugin,
@@ -574,7 +574,7 @@ class PluginManager {
       return true;
     }
 
-    PluginManager.triggerLocalEvent(plugin, `onDisable`);
+    this.triggerLocalEvent(plugin, `onDisable`);
 
     this.room._pluginsDisabled.push(pluginId);
 
@@ -943,7 +943,7 @@ class PluginManager {
         plugin.getPluginSpec().config = paramName;
       }
 
-      PluginManager.triggerLocalEvent(plugin, `onConfigSet`, {});
+      this.triggerLocalEvent(plugin, `onConfigSet`, {});
 
       return;
     }
@@ -952,10 +952,10 @@ class PluginManager {
     let oldValue = config[paramName];
     config[paramName] = value;
 
-    PluginManager.triggerLocalEvent(plugin, `onConfigSet`,
-        { paramName: paramName, newValue: value, oldValue: oldValue});
-    PluginManager.triggerLocalEvent(plugin, `onConfigSet_${paramName}`,
-        { newValue: value, oldValue: oldValue});
+    this.triggerLocalEvent(plugin, `onConfigSet`,
+        { paramName, newValue: value, oldValue});
+    this.triggerLocalEvent(plugin, `onConfigSet_${paramName}`,
+        { newValue: value, oldValue});
   }
 
   /**
@@ -984,30 +984,36 @@ class PluginManager {
   /**
    * Trigger an HHM event.
    *
-   * TODO documentation, make private?
+   * @TODO documentation, make private?
    *
    * @function PluginManager#triggerHhmEvent
    * @param {string} [eventName] Name of the event.
-   * @param {...*} [args] Event arguments.
+   * @param {Object} [args] Event arguments.
    */
-  triggerHhmEvent(eventName = HHM.events.OTHER, ...args) {
-    this.room.triggerEvent(`onHhm_${eventName}`, ...args);
-    this.room.triggerEvent(`onHhm`, eventName, ...args);
+  triggerHhmEvent(eventName = HHM.events.OTHER, args) {
+    $.extend(args, { eventName });
+    this.triggerEvent(`onHhm_${eventName}`, args);
+    this.triggerEvent(`onHhm`, args);
   }
 
   /**
    * Triggers an event only for the given plugin.
    *
-   * TODO make private?
+   * A corresponding HHM event will be triggered as well.
    *
-   * @function PluginManager.triggerLocalEvent
+   * @TODO make private?
+   *
+   * @function PluginManager#triggerLocalEvent
    * @param {external:haxball-room-trapper.TrappedRoom} plugin Plugin room
    *  proxy.
    * @param {string} eventHandlerName Name of the event handler.
    * @param {...*} [args] Event arguments.
    */
-  static triggerLocalEvent(plugin, eventHandlerName, ...args) {
-    return PluginManager._triggerEventOnRoom(plugin, eventHandlerName, ...args);
+  triggerLocalEvent(plugin, eventHandlerName, ...args) {
+    PluginManager._triggerEventOnRoom(plugin, eventHandlerName, ...args);
+    this.triggerHhmEvent(HHM.events.LOCAL_EVENT, {
+      localEventName: eventHandlerName, localEventArgs: args
+    });
   }
 
   /**
