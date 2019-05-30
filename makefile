@@ -9,6 +9,8 @@ all: build
 build: prepare_build jsdoc
 	@echo "Running browserify..."
 	browserify index.js -o dist/hhm.js -d
+	@echo "Generating version information"
+	./scripts/version.sh
 deploy: build
 	@echo "Deploying files..."
 	cp dist/*.js remote/

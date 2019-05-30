@@ -101,7 +101,7 @@ class TrappedRoomManager {
     // Convert names to IDs
     const pluginIds = pluginNames.map((pluginName) => {
       return this.room._pluginManager.getPluginId(pluginName);
-    });
+    }).filter((pluginId) => pluginId >= 0);
 
     // Add vertex [`pluginToBeExecutedBefore`, `pluginToBeExecutedAfter`]
     for (let otherPluginId of pluginIds) {
@@ -131,8 +131,15 @@ class TrappedRoomManager {
             .fill(undefined)).concat(metadata.forPlugin(pluginName));
       }
 
-      metadata.registerReturnValue(pluginName, handler(...args));
-    } else if (typeof handler !== `object`) {
+      try {
+        metadata.registerReturnValue(pluginName, handler(...args));
+      } catch (e) {
+        HHM.log.error(`Error during execution of handler ` +
+            `${metadata.handlerName} for plugin ${pluginName}`);
+        HHM.log.error(e);
+      }
+    }
+     else if (typeof handler !== `object`) {
       // TODO support string handlers?
       HHM.log.warn(`Invalid handler type: ${typeof handler}`);
     }
@@ -163,7 +170,8 @@ class TrappedRoomManager {
    * TODO remove
    */
   _isPluginEnabledAndLoaded(pluginId) {
-    return this.room.getPluginManager().getPluginById(pluginId).isEnabled();
+    return this.room.getPluginManager().hasPluginById(pluginId)
+      && this.room.getPluginManager().getPluginById(pluginId).isEnabled();
   }
 
   /**
@@ -624,11 +632,19 @@ class TrappedRoomManager {
         const pluginName = this.room._pluginManager.getPluginName(pluginId);
 
         for (let hook of this.preEventHandlerHooks[handlerName][pluginId]) {
-          let returnValue = hook({room: this.room,
-                metadata: metadata.forPlugin(pluginName)}, ...args);
+          try {
+            let returnValue = hook({
+              room: this.room,
+              metadata: metadata.forPlugin(pluginName)
+            }, ...args);
 
-          args = Array.isArray(returnValue) ? returnValue : args;
-          metadata.registerReturnValue(pluginName, returnValue);
+            args = Array.isArray(returnValue) ? returnValue : args;
+            metadata.registerReturnValue(pluginName, returnValue);
+          } catch (e) {
+            HHM.log.error(`Error during execution of pre-event handler hook ` +
+              `${handlerName} for plugin ${pluginName}`);
+            HHM.log.error(e);
+          }
         }
       }
     }
@@ -664,7 +680,13 @@ class TrappedRoomManager {
         const pluginName = this.room._pluginManager.getPluginName(pluginId);
 
         for (let hook of this.postEventHandlerHooks[handlerName][pluginId]) {
-          hook({ room: this.room, metadata: metadata.forPlugin(pluginName) }, ...args);
+          try {
+            hook({ room: this.room, metadata: metadata.forPlugin(pluginName) }, ...args);
+          } catch (e) {
+            HHM.log.error(`Error during execution of post-event handler hook ` +
+                `${handlerName} for plugin ${pluginName}`);
+            HHM.log.error(e);
+          }
         }
       }
     }

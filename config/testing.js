@@ -39,6 +39,7 @@ HHM.config.plugins = {
   },
   'sav/core': {},
   'sav/plugin-control': {},
+  'hr/spam': {},
 };
 
 HHM.config.repositories = [
@@ -51,6 +52,10 @@ HHM.config.repositories = [
   {
     type: `github`,
     repository: `saviola777/hhm-plugins`
+  },
+  {
+    type: `github`,
+    repository: `morko/hhm-sala-plugins`,
   },
 ];
 

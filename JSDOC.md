@@ -5,8 +5,13 @@ rooms easier and allow several headless scripts (plugins) to run in parallel and
 interact with each other. For further information, see the
 [GitHub repository](https://github.com/saviola777/haxball-headless-manager). 
 
-This page contains the HHM API documentation, as well as several tutorials
-illustrating the structure and inner workings of the system.
+This page contains the HHM API documentation, as well as several guides
+illustrating the structure and inner workings of the system:
+
+- {@tutorial writing-plugins}: For plugin authors and users who want to get an
+  overview of existing plugins.
+- {@tutorial events}: For a more in-depth explanation of the HHM event handling
+  and available event handlers.
 
 ## Acknowledgements
 

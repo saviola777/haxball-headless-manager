@@ -15,8 +15,6 @@
  * RoomObject is the main interface which lets you control the room and listen
  * to it's events.
  *
- * TODO make native RoomObject accessible from HhmRoomObject.
- *
  * @namespace external:native-api.RoomObject
  * @see https://github.com/haxball/haxball-issues/wiki/Headless-Host#roomobject
  */

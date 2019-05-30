@@ -9,11 +9,20 @@ module.exports.populate = () => {
   global.HHM = global.HHM || {};
 
   /**
-   * Current HHM version.
+   * Current HHM version information.
    *
    * @member HHM.version
    */
-  global.HHM.version = `0.9.1-git`;
+  global.HHM.version = {
+    identifier: require(`./_version`).npmVersionString.split(`@`)[2],
+    gitHash: require(`./_version`).gitHash,
+    buildDate: require(`./_version`).buildDate,
+  };
+
+  // Append git hash to version identifier if it ends with '-git'
+  if (HHM.version.identifier.endsWith(`-git`)) {
+    HHM.version.identifier += `#${HHM.version.gitHash}`;
+  }
 
   /**
    * Default base URL, can be overridden in the configuration file.
@@ -55,6 +64,14 @@ module.exports.populate = () => {
    * @member HHM.deferreds
    */
   global.HHM.deferreds = {};
+
+  /**
+   * Contains the hash function used within the HHM.
+   *
+   * @member HHM.hashFunction
+   * @see external:murmurhash3_32_gc
+   */
+  global.HHM.hashFunction = require(`./hash`);
 
   /**
    * Provides access to all classes of the HHM.

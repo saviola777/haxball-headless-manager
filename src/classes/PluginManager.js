@@ -55,36 +55,33 @@ class PluginManager {
    * When initially calling this function, do not pass a loadStack, the function
    * will then return the ID of the loaded plugin or -1 if there was an error.
    *
-   * @function PluginManager#_addPlugin
-   * @private
-   * @param {string} [pluginName] Name of the plugin, set to `undefined` if you
-   *  want to load a plugin by code.
-   * @param {(Function|string)} [pluginCode] Plugin code as `Function` or
+   * @function PluginManager#addPlugin
+   * @param {Object} [pluginInfo] Plugin information like name, url, or code.
+   *  At least one of URL, code or name has to be given
+   * @param {string} [pluginInfo.name] Name of the plugin, set to `undefined` if
+   *  you want to load a plugin by code.
+   * @param {(Function|string)} [pluginInfo.code] Plugin code as `Function` or
    *  `string`.
+   * @param {string} [pluginInfo.url] Plugin URL.
    * @param {Array.<number>} [loadStack] `Array` of loaded plugin IDs in load
    *  order. Used internally during recursion.
    * @returns {Promise<(number|Array.<number>)>} When called without a
    *  `loadStack`, it will return the plugin ID or -1 if the plugin failed to
    *  load, otherwise it will return the updated `loadStack`.
    */
-  async _addPlugin(pluginName, pluginCode, loadStack) {
+  async addPlugin({ pluginName, pluginCode, pluginUrl } = {}, loadStack) {
     const initializePlugins = loadStack === undefined;
     loadStack = loadStack || [];
-    let pluginId = -1;
 
     if (pluginName !== undefined && this.room.hasPlugin(pluginName)) {
       // Avoid loading plugins twice
-        return loadStack || this.room.getPluginId(pluginName);
+        return loadStack || this.room.getPluginId(plugName);
     }
 
-    if (pluginCode === undefined) {
-      pluginId = await this.pluginLoader.tryToLoadPluginByName(pluginName);
-    } else {
-      pluginId = this.pluginLoader.tryToLoadPluginByCode(pluginCode, pluginName);
-    }
+    const pluginId = await this.pluginLoader.tryToLoadPlugin(
+        { pluginName, pluginCode, pluginUrl });
 
-    loadStack = await this._checkPluginAndLoadDependencies(pluginId,
-        loadStack);
+    loadStack = await this._checkPluginAndLoadDependencies(pluginId, loadStack);
 
     const success = loadStack.indexOf(false) === -1;
 
@@ -92,7 +89,8 @@ class PluginManager {
       pluginName = this.getPluginName(pluginId);
 
       // Merge user config
-      this._mergeConfig(pluginName, (HHM.config.plugins || {})[pluginName]);
+      this._mergeConfig(pluginName,
+          (HHM.config.plugins || {})[pluginName]);
 
       if (initializePlugins) {
         HHM.log.info(`Loading plugin ${pluginName} and its dependencies`);
@@ -147,7 +145,7 @@ class PluginManager {
         continue;
       }
 
-      loadStack = await this._addPlugin(dependency, undefined, loadStack);
+      loadStack = await this.addPlugin({ pluginName: dependency }, loadStack);
 
       dependencySuccess = loadStack.indexOf(false) === -1
           && this._checkPluginsCompatible();
@@ -510,7 +508,7 @@ class PluginManager {
    * been loaded, -1 otherwise.
    */
   async addPluginByName(pluginName) {
-    return await this._addPlugin(pluginName);
+    return await this.addPlugin({ pluginName });
   }
 
   /**
@@ -527,7 +525,18 @@ class PluginManager {
    * been loaded, -1 otherwise.
    */
   async addPluginByCode(pluginCode, pluginName) {
-    return await this._addPlugin(pluginName, pluginCode);
+    return await this.addPlugin({ pluginName, pluginCode });
+  }
+
+  /**
+   * Loads a plugin from the given URL.
+   *
+   * @function PluginManager#addPluginByUrl
+   * @param {string} pluginUrl URL from which to load the plugin
+   * @param {string} [pluginName] Optional plugin name
+   */
+  async addPluginByUrl(pluginUrl, pluginName) {
+    return await this.addPlugin({ pluginUrl, pluginName });
   }
 
   /**
@@ -726,8 +735,6 @@ class PluginManager {
       }
     } else if (hasPlugin) {
       pluginRoom = this.room._plugins[this.room._pluginIds[pluginName]];
-    } else {
-      HHM.log.error(`Plugin not found: ${pluginName}`);
     }
 
     return pluginRoom;
@@ -905,10 +912,7 @@ class PluginManager {
     }
 
     if (room === undefined) {
-      if (HHM.config.dryRun) {
-        HHM.log.info(`Creating fake room for dry run`);
-        room = {};
-      } else if (typeof HHM.config.room === `object`) {
+      if (typeof HHM.config.room === `object`) {
         HHM.log.info(`Creating room, gl with the captcha`);
         room = HBInit(HHM.config.room);
       } else {
@@ -1056,12 +1060,13 @@ class PluginManager {
 
     await HHM.deferreds.roomLink.promise();
 
-    await this._addPlugin(`hhm/core`) >= 0 || (() => { throw startError })();
+    await this.addPlugin({ pluginName: `hhm/core` }) >= 0 ||
+        (() => { throw startError })();
 
     if (typeof Storage !== `undefined`) {
       HHM.storage = HHM.storage || require(`../storage`);
 
-      await this._addPlugin(`hhm/persistence`) >= 0 ||
+      await this.addPlugin({ pluginName: `hhm/persistence` }) >= 0 ||
           (() => { throw startError })();
     } else {
       HHM.log.warn(`No support for localStorage, persistence is disabled`);
@@ -1077,6 +1082,6 @@ class PluginManager {
 
     return room;
   }
-};
+}
 
 module.exports = PluginManager;

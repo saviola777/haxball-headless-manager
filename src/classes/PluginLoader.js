@@ -1,3 +1,6 @@
+const hashFunction = require(`../hash`);
+const hashSeed = 14868;
+
 // Repository defaults.
 const repositoryDefaults = {
   type: `plain`,
@@ -62,6 +65,7 @@ class PluginLoader {
 
     pluginRoom._source = typeof pluginCode === `function`
         ? pluginCode.toString() : pluginCode;
+    pluginRoom._sourceHash = hashFunction(pluginRoom._source, hashSeed);
   }
 
   /**
@@ -101,6 +105,7 @@ class PluginLoader {
             that.room._pluginManager._removePlugin(pluginRoom._id);
           } else {
             HHM.log.info(`Plugin source loaded: ${pluginUrl}`);
+            pluginRoom._loadedFrom = pluginUrl;
           }
         },
       });
@@ -217,6 +222,26 @@ class PluginLoader {
   }
 
   /**
+   * Tries to load a plugin from name, code, or URL.
+   *
+   * Convenience function which calls one of the other `tryToLoadPlugin`
+   * functions.
+   */
+  async tryToLoadPlugin({ pluginName, pluginCode, pluginUrl } = {}) {
+    let pluginId = -1;
+
+    if (pluginCode !== undefined) {
+      pluginId = this.tryToLoadPluginByCode(pluginCode, pluginName);
+    } else if (pluginUrl !== undefined) {
+      pluginId = await this.tryToLoadPluginByUrl(pluginUrl, pluginName);
+    } else if (pluginName !== undefined) {
+      pluginId = await this.tryToLoadPluginByName(pluginName);
+    }
+
+    return pluginId;
+  }
+
+  /**
    * Tries to load a plugin from the plugin code.
    *
    * @function PluginLoader#tryToLoadPluginByCode
@@ -228,6 +253,7 @@ class PluginLoader {
    */
   tryToLoadPluginByCode(pluginCode, pluginName) {
     const pluginRoom = this.room.getPlugin(pluginName, true);
+    pluginRoom._loadedFrom = undefined;
     this._executePlugin(pluginCode, pluginRoom);
 
     return pluginRoom._id;

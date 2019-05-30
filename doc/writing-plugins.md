@@ -1,15 +1,8 @@
 # <a name="writing"></a> Writing & publishing plugins
 
 To turn a regular headless script into an HHM plugin, nothing has to be changed
-unless
-
-- the script uses custom intervals to execute logic (these can be turned into room event handlers using the `sav/cron` plugin),
-- the script uses ES6 destructuring with default values like
-  `function({ param = 'default' } = { param: 'something else' })` in event
-  handlers, since this is currently not
-  [supported](https://github.com/arrizalamin/js-function-reflector/issues/17)
-  by the library which is used to inject metadata parameters into event
-  handlers.
+unless the script uses custom intervals to execute logic (these can be turned
+into room event handlers using the `sav/cron` plugin).
 
 The HHM provides a `HBInit()` function which returns a room instance just as you
 would expect, parameters to this function are ignored.
@@ -98,7 +91,7 @@ For available event handlers, refer to
 
 - the [native RoomObject documentation]{@link external:native-api.RoomObject},
 - the documentation of the plugins you are using (see below for core plugins),
-- the {@tutorial events} guide
+- {@tutorial events} guide
 - and the following section, which will introduce HHM-specific event handlers.
 
 ## Local events
@@ -159,7 +152,15 @@ If you cannot afford data loss, you may call
 room.getPlugin("hhm/persistence").persistPluginData(room);
 ```
 
-manually, which will then trigger a call to your `onPersist` handler.
+manually, which will then trigger a call to your `onPersist` handler. You can
+also call `persistAllPluginData()` – this should not be done unreasonably often,
+for obvious reasons.
+
+Before any kind of persistence happens (no matter if for
+all or just one plugin), the event `onBeforePersist` is triggered for all
+plugins. This is to allow plugins which rely on other plugins for their data
+storage and persistence to prepare for data persistence (since the actual
+persistence always happens in plugin load order).
 
 When a plugin is loaded, the persistence plugin will call
 `onRestore(data, pluginSpec)` if the handler is defined and persisted data
@@ -282,14 +283,9 @@ which allows adding more arguments easily if all plugin authors follow it:
 - any number of properties can be extracted from this object, for example using
   object destructuring – prefix the properties with your plugin name for
   bonus points
-- using default values should best not be done in the function signature, but
-  rather afterwards, e.g.
-  `myPlugin_level = myPlugin_level === undefined ? 'default' : myPlugin_level;`
-  or just `myPlugin_level = myPlugin_level || 'default';` if you do not allow
-  [falsy](https://developer.mozilla.org/en-US/docs/Glossary/Falsy) for your
-  parameter.
-  If you want to do it in the function signnature, it would look like this:
-  `{ myPlugin_level = 'default' } = { myPlugin_level: 'default' }`.
+- using default values should best be done in the function signature, it would
+  look like this:
+  `{ myPlugin_level = 'default' } = {}`.
 - this object must be passed to the `previousFunction`, for example using
   `arguments[arguments.length - 1]` (__note__: this is not possible when using
   arrow functions)
@@ -339,7 +335,7 @@ include the specific plugin in your dependencies.
 
 If you want to include all of these, just depend on the `sav/core` meta plugin.
 
-### <a name="plugin_sav_commands"></a> sav/commands: Easier command processing
+### <a name="plugin_sav_commands"></a> `sav/commands`: Easier command processing
 
 One of the first things most plugin authors will make use of it player commands,
 i.e. the player types something like `!swap` in the room and then the plugin
@@ -423,7 +419,7 @@ If you need more control, here you go:
 For more information, check the [source code](https://github.com/saviola777/hhm-plugins/blob/master/src/sav/commands.js).
 
 
-### <a name="plugin_sav_cron"></a> sav/cron: Execute code repeatedly or with delay
+### <a name="plugin_sav_cron"></a> `sav/cron`: Execute code repeatedly or with delay
 
 "Okay," you will ask me, "why do we need this? `setTimeout()` and `setInterval()`
 are easy enough to use!" True, but: one of the ideas of this plugin system is to
@@ -470,7 +466,7 @@ room.onCron7GameMinutesOnce = () => { /* executed once after 7 ingame minutes */
 
 For more information, check the [plugin source](https://github.com/saviola777/hhm-plugins/blob/master/src/sav/cron.js).
 
-### <a name="plugin_sav_roles"></a> sav/roles: Role and group management
+### <a name="plugin_sav_roles"></a> `sav/roles`: Role and group management
 
 This is a utility plugin offering role management via authentication and
 explicit assignment.
@@ -526,7 +522,7 @@ room.onPlayerRoleAdded_cheerleader = (player) => {
 };
 
 room.onCommand_cheer = (player) => {
-  if (roles.ensurePlayerRole(player.id, `cheerleader`, `abc/cheer`, `!cheer`)) {
+  if (roles.ensurePlayerRole(player.id, `cheerleader`, room, `!cheer`)) {
     room.sendChat(`${player.name} is cheering!`);
   }
 };
@@ -562,7 +558,7 @@ To keep track of role changes, the plugin offers the following event handlers:
 
 For more information, see the [plugin source](https://github.com/saviola777/hhm-plugins/blob/master/src/sav/roles.js).
 
-### <a name="plugin_sav_help"></a> sav/help: Display help and usage information
+### <a name="plugin_sav_help"></a> `sav/help`: Display help and usage information
 
 Players joining your room for the first time will have no idea about all the
 commands your plugins provide, so it is important to provide help texts and
@@ -608,7 +604,7 @@ plans include:
 
 For more information see the [plugin source](https://github.com/saviola777/hhm-plugins/blob/master/src/sav/help.js).
 
-### <a name="plugin_sav_players"></a> sav/chat: Enhanced chat
+### <a name="plugin_sav_players"></a> `sav/chat`: Enhanced chat
 
 The chat plugin was meant to completely re-implement the haxball chat, adding
 timestamps, channels, a PM system between players, and more. To do this, all
@@ -629,7 +625,7 @@ room.sendChat(`Global message`, undefined, `REFEREE`);
 
 For more information see the [plugin source](https://github.com/saviola777/hhm-plugins/blob/master/src/sav/chat.js).
 
-### <a name="plugin_sav_players"></a> sav/players: Store player-specific information
+### <a name="plugin_sav_players"></a> `sav/players`: Store player-specific information
 
 If you want to store player-specific data in your plugin, you can of course do
 so simply using an object with the player IDs as keys. But then you'd have to
@@ -696,9 +692,9 @@ For more information… [you know the drill](https://github.com/saviola777/hhm-p
 
 ## `sav/*`
 
-Other plugins provided by the HHM main author.
+Other plugins provided by [saviola777](https://github.com/saviola777/).
 
-### `sav/plugin-control`
+### `sav/plugin-control`: Plugin management from within the room
 
 This plugin is still work in progress and aims to provide hosts and admins the
 option of managing plugins from within the room.

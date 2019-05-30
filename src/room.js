@@ -64,6 +64,24 @@ module.exports.createRoom = function(room, pluginManager) {
     },
 
     /**
+     * Add a hook for the given handler name that is executed after plugin
+     * event handlers.
+     *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @param {string} handlerNames Event handler name.
+     * @param {Function} hook Hook function.
+     * @returns {HhmRoomObject} Fluent interface.
+     * @see TrappedRoomManager#addPostEventHandlerHook
+     */
+    addPostEventHandlerHook: function(handlerNames, hook) {
+      pluginManager.getRoomManager()
+      .addPostEventHandlerHook(this._id, handlerNames, hook);
+
+      return this;
+    },
+
+    /**
      * Add a hook for the given handler name that is executed before plugin
      * event handlers.
      *
@@ -77,24 +95,6 @@ module.exports.createRoom = function(room, pluginManager) {
     addPreEventHandlerHook: function(handlerNames, hook) {
       pluginManager.getRoomManager()
           .addPreEventHandlerHook(this._id, handlerNames, hook);
-
-      return this;
-    },
-
-    /**
-     * Add a hook for the given handler name that is executed after plugin
-     * event handlers.
-     *
-     * @memberOf HhmRoomObject
-     * @instance
-     * @param {string} handlerNames Event handler name.
-     * @param {Function} hook Hook function.
-     * @returns {HhmRoomObject} Fluent interface.
-     * @see TrappedRoomManager#addPostEventHandlerHook
-     */
-    addPostEventHandlerHook: function(handlerNames, hook) {
-      pluginManager.getRoomManager()
-          .addPostEventHandlerHook(this._id, handlerNames, hook);
 
       return this;
     },
@@ -126,6 +126,12 @@ module.exports.createRoom = function(room, pluginManager) {
         room[name] = element;
         return true;
       } else if (typeof element === `function`) {
+        if (!isValidExtensionFunction(element)) {
+          HHM.log.error(`Unable to extend room with invalid extension function `
+              + `for property ${name}: function must expect destructuring `
+              + `object as first parameter`);
+        }
+
         const previousFn = room[name];
         const definingPlugin = this;
 
@@ -152,6 +158,30 @@ module.exports.createRoom = function(room, pluginManager) {
     },
 
     /**
+     * Returns the configuration of this plugin.
+     *
+     * If no parameter name is given, the whole config object is returned.
+     *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @param {string} [paramName] Configuration parameter name. If `undefined`,
+     *  complete config is returned.
+     * @returns {(Object|undefined|*)} Configuration object or value of the
+     *  given configuration parameter or `undefined` if no such configuration
+     *  parameter exists.
+     */
+    getConfig: function(paramName) {
+      const pluginSpec = this.getPluginSpec();
+
+      if (!pluginSpec.hasOwnProperty(`config`)) {
+        pluginSpec.config = {};
+      }
+
+      return paramName === undefined ? pluginSpec.config :
+          pluginSpec.config[paramName];
+    },
+
+    /**
      * Returns the handler names specific to this plugin.
      *
      * @memberOf HhmRoomObject
@@ -172,6 +202,16 @@ module.exports.createRoom = function(room, pluginManager) {
      */
     getId: function() {
       return this._id;
+    },
+
+    /**
+     * Returns the URL this plugin was loaded from or undefined if it was
+     * loaded via the API.
+     *
+     * @TODO set _loadedFrom to something other than undefined if not from URL?
+     */
+    getLoadedFrom: function() {
+      return this._loadedFrom;
     },
 
     /**
@@ -198,16 +238,6 @@ module.exports.createRoom = function(room, pluginManager) {
     },
 
     /**
-     * Returns the associated plugin manager.
-     *
-     * @memberOf HhmRoomObject
-     * @returns {PluginManager} Associated plugin manager.
-     */
-    getPluginManager: function() {
-      return pluginManager;
-    },
-
-    /**
      * Returns the trapped room for the given plugin.
      *
      * @memberOf HhmRoomObject
@@ -226,27 +256,13 @@ module.exports.createRoom = function(room, pluginManager) {
     },
 
     /**
-     * Returns the configuration of this plugin.
-     *
-     * If no parameter name is given, the whole config object is returned.
+     * Returns the associated plugin manager.
      *
      * @memberOf HhmRoomObject
-     * @instance
-     * @param {string} [paramName] Configuration parameter name. If `undefined`,
-     *  complete config is returned.
-     * @returns {(Object|undefined|*)} Configuration object or value of the
-     *  given configuration parameter or `undefined` if no such configuration
-     *  parameter exists.
+     * @returns {PluginManager} Associated plugin manager.
      */
-    getConfig: function(paramName) {
-      const pluginSpec = this.getPluginSpec();
-
-      if (!pluginSpec.hasOwnProperty(`config`)) {
-        pluginSpec.config = {};
-      }
-
-      return paramName === undefined ? pluginSpec.config :
-          pluginSpec.config[paramName];
+    getPluginManager: function() {
+      return pluginManager;
     },
 
     /**
@@ -289,6 +305,17 @@ module.exports.createRoom = function(room, pluginManager) {
     },
 
     /**
+     * Returns the hash of the plugin source code.
+     *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @returns {number} 32-bit positive integer hash
+     */
+    getSourceHash: function() {
+      return this._sourceHash;
+    },
+
+    /**
      * Returns whether this plugin has a name.
      *
      * @memberOf HhmRoomObject
@@ -311,20 +338,6 @@ module.exports.createRoom = function(room, pluginManager) {
     },
 
     /**
-     * Returns whether the plugin has been fully loaded.
-     *
-     * A plugin is loaded when all of its dependencies have been loaded and its
-     * `onRoomLink` handler has been executed.
-     *
-     * @memberOf HhmRoomObject
-     * @instance
-     * @returns {boolean} Whether the plugin has been fully loaded.
-     */
-    isLoaded: function() {
-      return (this._lifecycle !== undefined && this._lifecycle.loaded) || false;
-    },
-
-    /**
      * Returns whether this plugin is enabled.
      *
      * A plugin can only be enabled once it has been fully loaded.
@@ -336,6 +349,20 @@ module.exports.createRoom = function(room, pluginManager) {
     isEnabled: function() {
       return this.isLoaded()
           && pluginManager.room._pluginsDisabled.indexOf(this._id) === -1;
+    },
+
+    /**
+     * Returns whether the plugin has been fully loaded.
+     *
+     * A plugin is loaded when all of its dependencies have been loaded and its
+     * `onRoomLink` handler has been executed.
+     *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @returns {boolean} Whether the plugin has been fully loaded.
+     */
+    isLoaded: function() {
+      return (this._lifecycle !== undefined && this._lifecycle.loaded) || false;
     },
 
     /**
@@ -402,3 +429,17 @@ module.exports.createRoom = function(room, pluginManager) {
     },
   });
 };
+
+const functionReflector = new HHM.classes.FunctionReflector(
+    Math.floor((Math.random() * 10000) + 1));
+
+/**
+ * Returns whether the given function expects a destructuring object first.
+ */
+function isValidExtensionFunction(fn) {
+  const reflectionResult = functionReflector.forFunction(fn);
+
+  return reflectionResult.params.length === 0
+      || (reflectionResult.params[0].type === `DESTRUCTURING`
+      && reflectionResult.params[0].value.type === `object`);
+}
