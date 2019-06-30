@@ -1,6 +1,6 @@
 # Changelog
 
-## Version 0.9.2-git
+## Version 0.9.2
 
 - first release which is deployed on [surge.sh](https://surge.sh)
 - adjust config to haxroomie update
