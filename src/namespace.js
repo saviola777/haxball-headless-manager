@@ -25,40 +25,18 @@ module.exports.populate = () => {
   }
 
   /**
-   * Default base URL, can be overridden in the configuration file.
-   *
-   * The base URL is used to load the HHM and core plugins. Mainly useful during
-   * development when switching between stable and development versions of the
-   * HHM and its plugins.
-   *
-   * @member HHM.baseUrl
-   */
-  global.HHM.baseUrl = HHM.baseUrl || `https://haxplugins.tk/`;
-
-  /**
-   * URL for the CORS proxy.
-   *
-   * This is used to allow plugins to be loaded from external sources which
-   * are not configured for CORS. Make sure there is a CORS Anywhere reverse
-   * proxy running at this URL or plugin loading will not work.
-   *
-   * @see https://github.com/Rob--W/cors-anywhere
-   * @member HHM.proxyUrl
-   */
-  global.HHM.proxyUrl = HHM.proxyUrl || `https://haxplugins.tk/proxy/`;
-
-  /**
    * Logger.
    *
    * @see module:src/log
    * @member HHM.log
    */
   global.HHM.log = require(`./log`)();
+  HHM.log.setLevel(HHM.config.logLevel || HHM.log.getLevel());
 
   /**
    * Stores global deferreds.
    *
-   * These are JQuery deferred objects.
+   * These are jQuery deferred objects.
    *
    * @see https://api.jquery.com/category/deferred-object/
    * @member HHM.deferreds
@@ -102,7 +80,7 @@ module.exports.populate = () => {
      *
      * @property {HhmRoomObject} plugin Associated plugin.
      * @property {string} handlerName Name of the event handler.
-     * @property {Function} handlerFunction Handler function.
+     * @property {*} handler Handler function or object.
      *
      * @memberOf HHM.events
      */
@@ -113,7 +91,7 @@ module.exports.populate = () => {
      *
      * @property {HhmRoomObject} plugin Associated plugin.
      * @property {string} handlerName Name of the event handler.
-     * @property {Function} handlerFunction Previously set handler function.
+     * @property {*} handler Previously set handler function or object.
      */
     'EVENT_HANDLER_UNSET': `eventHandlerUnset`,
 

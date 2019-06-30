@@ -5,7 +5,7 @@
     ],
     "recurseDepth": 10,
     "source": {
-        "include": ["package.json", "JSDOC.md"],
+        "include": ["package.json", "./doc/jsdoc.md"],
         "includePattern": ".+\\.js(doc|x)?$",
         "excludePattern": "(^|\\/|\\\\)_"
     },
@@ -52,11 +52,11 @@
         "scripts"               : []
     },
     "opts": {
-        "destination": "./jsdoc/",
+        "destination": "./dist/api/",
         "encoding": "utf8",
         "private": true,
         "recurse": true,
         "template": "./node_modules/foodoc/template",
-        "tutorials": "./doc"
+        "tutorials": "./jsdoc"
     }
 }

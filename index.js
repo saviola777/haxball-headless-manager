@@ -5,8 +5,6 @@ global.$ = global.jQuery =
 
 require(`./src/namespace`).populate();
 
-require(`./src/ajax`).applyProtocolWorkaround();
-
 // Create plugin manager
 HHM.manager = new HHM.classes.PluginManager();
 

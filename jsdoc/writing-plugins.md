@@ -322,8 +322,65 @@ There are several ways to publish your plugin:
   copy & paste the plugin into the
   [web interface](https://github.com/morko/haxroomie-web) or dev console.
 
-Let me know if you need help setting up your own repository.
+The next section will show you how to set up your own repository.
 
+## Creating your own plugin repository
+
+There are currently three ways to deploy your own plugin repository:
+
+- using a webserver to directly serve the plugins
+- using a GitHub repository
+- using a custom web app to serve the plugins
+
+The first two will be described here, the last one is an advanced variant of the
+first.
+
+### Using a webserver
+
+Assuming your domain is `yourdomain.tld` and you put the plugin
+`author/plugin-name` so that it can be accessed at the URL
+`https://yourdomain.tld/plugins/author/plugin-name.js`, your repository entry
+would look like this:
+
+```javascript
+HHM.config.repositories = [
+    // […]
+    {
+      type: `plain`, // optional, this is the default value
+      url: `https://yourdomain.tld/plugins/`,
+      suffix: `.js`, // optional, this is the default value
+    }
+];
+```
+
+Make sure you have your server set up to send
+[CORS headers](https://enable-cors.org/) or else your plugins can't be loaded
+
+### Using a GitHub repository
+
+When it comes to a GitHub repository there are three things you need to know:
+the repository name (i.e. user + repository), the path within the repository
+where the plugins are stored, and the version of the repository (a branch,
+commit, or tag) you want to use.
+
+Assuming your repository is accessible at
+`https://github.com/XHerna/fm-publicbot`
+and your plugins are stored in the directory `plugins` in the repository, and
+you want to use the master branch (i.e., the plugin `fm/team-fill` would
+be available at `https://github.com/XHerna/fm-publicbot/blob/master/plugins/fm/team-fill.js`), the entry would look like this:
+
+```javascript
+HHM.config.repositories = [
+    // […]
+    {
+      type: `github`,
+      repository: `XHerna/fm-publicbot`,
+      path: `plugins`, // optional, defaults to `src`
+      version: `master`, // optional, this is the default value
+      suffix: `.js`, // optional, this is the default value
+    }
+];
+```
 
 # Useful plugins
 
@@ -411,10 +468,11 @@ If you need more control, here you go:
   name suggests.
 - the plugin exposes its parsing function to the public, so if you need to split
   by something other than a space, for example, you can use it:
-  `room.getPlugin("sav/commands").parseMessage(originalMessage, numArgsMax, commandPrefix, separator)` which will return an object containing the properties `command`,
+  `room.getPlugin("sav/commands").parseMessage(originalMessage, numArgsMax, commandPrefix, separator)`
+  which will return an object containing the properties `command`,
   `arguments`, `argumentString`, `separator`, `originalMessage` – if the message
   could not be parsed as a command, the `command` property will be an empty
-  `string`
+  `string`.
 
 For more information, check the [source code](https://github.com/saviola777/hhm-plugins/blob/master/src/sav/commands.js).
 
@@ -496,16 +554,24 @@ ignore the `haxroomie.adminPassword` for now). You can add more roles here if
 you like, but you can also add them programmatically later. It's probably a good
 idea to change the default password!
 
+There are two types of roles:
+
+- Player roles are temporary roles assigned to a player which are lost when the
+  user refreshes his browser and re-joins the room.
+- User roles are persistent roles which are assigned to every player with the
+  same auth as the player it was initially assigned to
+
 Let's look at authentication, how do people actually authenticate for their role?
 In this example, a player would need to write
 
 `!auth admin haxroomie`
 
 to authenticate for the `admin` role (which would give them admin immediately,
-and automatically from now on each time they join).
+and automatically from now on each time they join – it's a user role).
 
 But how do you use all of this in your plugin? Let's look at an example where we
-simply add a custom role `cheerleader` who can execute the command `!cheer`:
+simply add a custom role `cheerleader` which allows execution of the command
+`!cheer`:
 
 ```javascript
 let roles;
@@ -522,7 +588,7 @@ room.onPlayerRoleAdded_cheerleader = (player) => {
 };
 
 room.onCommand_cheer = (player) => {
-  if (roles.ensurePlayerRole(player.id, `cheerleader`, room, `!cheer`)) {
+  if (roles.ensurePlayerRoles(player.id, `cheerleader`, room, { feature: `!cheer` })) {
     room.sendChat(`${player.name} is cheering!`);
   }
 };
@@ -532,27 +598,33 @@ Now if a player wrote `!auth cheerleader ch33r`, they would be allowed to execut
 the `!cheer` command. Other players executing the command would get the message:
 
 ```
-Access denied for !cheer of plugin abc/cheer. Player playerName does not have
-role cheerleader.
+Access denied for !cheer of plugin abc/cheer. It requires one of the following
+player roles: cheerleader.
 ```
 
 The most important functions of this plugin include:
 
-- `addPlayerRole(playerId, role, persistent = false)`: give role to player,
-  persistent roles are kept after the player leaves and re-joins the room.
-- `hasPlayerRole(playerId, role)`: returns whether the player has the given role.
-- `ensurePlayerRole(playerId, role, plugin, feature, message)`: convenience
-  function to ensure the player has the role and print an error message if not.
-- `removePlayerRole(playerId, role)`: removed the role from the player.
+- `addPlayerRole(playerId, role, userRole = false)`: give role to player,
+  user roles are kept after the player leaves and re-joins the room.
+- `hasPlayerRole(playerId, role, userRole = false)`: returns whether the player
+  has the given player/user role.
+- `ensurePlayerRoles(playerId, roles, plugin, { feature, message = "Access denied", userRole = false })`:
+  convenience function to ensure the player has at least one of the given player
+  / user roles and print
+  an error message if not. `roles` can be a single role or an array of roles.
+- `removePlayerRole(playerId, role)`: removes the role from the player and user.
 
 To keep track of role changes, the plugin offers the following event handlers:
 
-- `onPlayerRole(player, role, added)`: called whenever a role is added or removed.
-- `onPlayerRole_roleName(player, added)`: called whenever the specific role is
-  added or removed.
-- `onPlayerRoleAdded(player, role)` and `onPlayerRoleRemoved(player, role)`:
+- `onPlayerRole(player, role, added, userRole)`: called whenever a role is added
+  or removed.
+- `onPlayerRole_roleName(player, added, userRole)`: called whenever the specific
+  role is added or removed.
+- `onPlayerRoleAdded(player, role, userRole)` and
+  `onPlayerRoleRemoved(player, role, userRole)`:
   called whenever a role is added or removed.
-- `onPlayerRoleAdded_roleName(player)` and `onPlayerRoleRemoved_roleName(player)`:
+- `onPlayerRoleAdded_roleName(player, userRole)` and
+  `onPlayerRoleRemoved_roleName(player, userRole)`:
   called whenever the specific role is added or removed.
 
 
@@ -588,14 +660,14 @@ room.onCommand_help_auth = (player) => room.sendChat(`Usage: !auth ROLE PASSWORD
 ```
 
 Plus the correct command prefix will automatically be displayed. If you want to
-display the help text to the user (for example because he used the command
+display the help text to the user (for example because they used the command
 wrongly), you can write
 
 ```javascript
 room.getPlugin(`sav/help`).displayHelp(playerId, `auth`);
 ```
 
-And that's it (for now). The help plugin is still not feature-complete, future
+And that's it (for now). The help plugin is still work in progress, future
 plans include:
 
 - displaying the help text when calling a command without parameters
@@ -707,6 +779,76 @@ Current features:
   not be depended on by other enabled plugins.
 - Load plugins by name or URL using `!plugin load nameOrUrl`, supports raw JS
   and pastebin links
+
+
+# HHM development and local deployment with haxroomie
+
+While HHM can be run directly using the provided configuration files, it still
+requires some copy&paste or upload of files, so the recommended workflow is to
+use haxroomie now.
+
+First download and build haxroomie:
+
+```bash
+git clone https://github.com/morko/haxroomie.git
+# switch to development branch (optional)
+git checkout develop
+npm install
+```
+
+Now you can setup an alias for haxroomie
+
+```bash
+alias haxroomie="~/git/haxroomie/src/cli/index.js -d ~/git/haxroomie/data -c ~/git/haxball-headless-manager/local/haxroomie/config-testing.js -w"
+```
+
+Adjust the paths for the haxroomie, user data and config directory as needed.
+
+In your haxroomie config, you can specify local repositories as well as the
+local HHM file:
+
+```javascript
+let config = {
+  // ID for the room (has to be unique):
+  'room1': {
+
+    // Options for room1:
+    autoStart: true,
+    roomName: 'haxroomie',
+    playerName: 'host',
+    maxPlayers: 12,
+    public: false,
+    token: process.env.HAXBALL_TOKEN,
+    repositories: [
+      {
+        type: `github`,
+        repository: `morko/hhm-sala-plugins`,
+      },
+      {
+        type: `local`,
+        path: `/home/USER/git/hhm-plugins`
+      },
+    ],
+    pluginConfig: {
+      'sav/roles': {
+        roles: {
+          admin: 'adminpass',
+          host: 'hostpass',
+        },
+      },
+      'sav/core': {},
+      'sav/plugin-control': {},
+      'hr/spam': {},
+      'local/test': {}
+    },
+    hhm: '/home/USER/git/haxball-headless-manager/dist/.local/hhm-testing.js',
+  },
+};
+module.exports = config;
+```
+
+To build HHM, run `make` in the repository directory after installing its
+dependencies using `npm install`.
 
 
 # Further reading

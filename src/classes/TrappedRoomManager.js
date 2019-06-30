@@ -451,19 +451,19 @@ class TrappedRoomManager {
    * @function TrappedRoomManager#onEventHandlerSet
    * @param {*} _ Unused.
    * @param {string} handlerName Event handler name.
-   * @param {Function} handlerFunction Event handler function
+   * @param {*} handler Event handler function or object
    * @param {number} pluginId Plugin ID.
    */
-  onEventHandlerSet(_, handlerName, handlerFunction, pluginId) {
+  onEventHandlerSet(_, handlerName, handler, pluginId) {
     this._provideHandlerObjectForIdentifier(pluginId);
     this.handlerNames.add(handlerName);
 
-    this.handlers[pluginId][handlerName] = handlerFunction;
+    this.handlers[pluginId][handlerName] = handler;
 
     this.handlersDirty = true;
 
     this.room._pluginManager.triggerHhmEvent(HHM.events.EVENT_HANDLER_SET, {
-      handlerFunction: handlerFunction,
+      handler: handler,
       handlerName: handlerName,
       plugin: this.room._pluginManager.getPluginById(pluginId),
     });
@@ -480,7 +480,7 @@ class TrappedRoomManager {
   onEventHandlerUnset(_, handlerName, pluginId) {
     this._provideHandlerObjectForIdentifier(pluginId);
 
-    const handlerFunction = this.handlers[pluginId][handlerName];
+    const handler = this.handlers[pluginId][handlerName];
     const plugin = this.room._pluginManager.getPluginById(pluginId);
 
     delete this.handlers[pluginId][handlerName];
@@ -488,7 +488,7 @@ class TrappedRoomManager {
     this.handlersDirty = true;
 
     this.room._pluginManager.triggerHhmEvent(HHM.events.EVENT_HANDLER_UNSET, {
-      handlerFunction, handlerName, plugin,
+      handler, handlerName, plugin,
     });
   }
 

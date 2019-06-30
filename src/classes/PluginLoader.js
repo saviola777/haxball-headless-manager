@@ -1,11 +1,6 @@
 const hashFunction = require(`../hash`);
+const deepEqual = require(`deep-equal`);
 const hashSeed = 14868;
-
-// Repository defaults.
-const repositoryDefaults = {
-  type: `plain`,
-  suffix: `.js`,
-};
 
 /**
  * PluginLoader class, responsible for loading plugins via repositories or via
@@ -24,7 +19,7 @@ class PluginLoader {
     this.room = room;
     this.repositoryTypeHandlers = require(`../repositories`);
 
-    this._prepareRepositoryConfigurations(repositories);
+    this.initializeRepositories(repositories);
   }
 
   /**
@@ -118,19 +113,31 @@ class PluginLoader {
   }
 
   /**
-   * Prepare the repository configurations.
+   * Returns whether the given repository already exists.
    *
-   * Adds the given repositories using {@link PluginLoader#addRepository}.
+   * A deep comparison is performed between repository objects.
    *
-   * @function PluginLoader#_prepareRepositoryConfigurations
-   * @private
+   * @function PluginLoader#hasRepository
+   * @param {Object} repository Repository object to be checked
+   * @returns {boolean} true if the repository exists, false otherwise
+   */
+  hasRepository(repository) {
+    return this.repositories.some((r) => deepEqual(repository, r));
+  }
+
+  /**
+   * Initialize the repository configurations.
+   *
+   * Adds the given repositories using {@link PluginLoader#addRepository} after
+   * removing all existing repositories.
+   *
+   * @function PluginLoader#initializeRepositories
    * @param {Array.<(string|Object)>} repositories Array of repositories, as
    *  strings or objects.
    * @see module:src/repositories
    */
-  _prepareRepositoryConfigurations(repositories) {
+  initializeRepositories(repositories) {
     this.repositories = [];
-    let repositoryObject;
     for (let repository of repositories) {
       this.addRepository(repository, true);
     }
@@ -157,20 +164,13 @@ class PluginLoader {
    * - `suffix`: `.js`
    *
    * @function PluginLoader#addRepository
-   * @param {(string|Object)} repository The repository to be added, as `string`
-   *  or `Object`.
+   * @param {Object} repository The repository to be added.
    * @param {boolean} [append] Whether to append or prepend the repository to
    *  the `Array` of repositories.
    * @returns {boolean} Whether the repository was successfully added.
    */
   addRepository(repository, append = false) {
-    let repositoryObject;
-
-    if (typeof repository === `string`) {
-      repositoryObject = $.extend({ url: repository }, repositoryDefaults);
-    } else {
-      repositoryObject = $.extend({}, repositoryDefaults, repository);
-    }
+    let repositoryObject = $.extend({}, repository);
 
     if (this.repositoryTypeHandlers[repositoryObject.type] === undefined) {
       HHM.log.error(`No handler for repository type "${repositoryObject.type}"`);
@@ -178,13 +178,8 @@ class PluginLoader {
     }
 
     // Check if repository exists
-    let testPluginName = `hhm/core`;
     for (let existingRepository of this.repositories) {
-      if (this.repositoryTypeHandlers[existingRepository.type](
-          existingRepository, testPluginName)
-          === this.repositoryTypeHandlers[repositoryObject.type](
-              repositoryObject, testPluginName)) {
-
+      if (deepEqual(repositoryObject, existingRepository)) {
         HHM.log.warn(`Skipping duplicate repository entry for repository of`
             + `type "${repositoryObject.type}"`);
         return false;
@@ -274,19 +269,25 @@ class PluginLoader {
         continue;
       }
 
-      let pluginUrl = this.repositoryTypeHandlers[repository.type](
+      let repositoryResult = this.repositoryTypeHandlers[repository.type](
           repository, pluginName);
 
-      if (pluginUrl === false) {
+      if (repositoryResult === false) {
         HHM.log.debug(`Repository handler ${repository.type} returned false `
           + `for plugin ${pluginName}`);
         continue;
       }
 
-      HHM.log.debug(`Trying to load plugin ${pluginName} from ` +
-        `${repository.type} repository: ${pluginUrl}`);
+      // Check if it's a URL
+      if (repositoryResult.startsWith(`http`)) {
+        HHM.log.debug(`Trying to load plugin ${pluginName} from ` +
+            `${repository.type} repository: ${repositoryResult}`);
 
-      await this._loadPlugin(pluginUrl, pluginName);
+        await this._loadPlugin(repositoryResult, pluginName);
+      } else if (repositoryResult.length > 0) {
+        // Assume it's plugin code
+        await this.tryToLoadPluginByCode(repositoryResult, pluginName);
+      }
 
       if (this.room.hasPlugin(pluginName)) {
         return this.room._pluginManager.getPluginId(pluginName);

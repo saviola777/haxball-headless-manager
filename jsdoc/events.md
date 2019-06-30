@@ -59,7 +59,7 @@ To add pre-event handler hooks, call {@link HhmRoomObject#addPreEventHandlerHook
 with the handler name(s) for which you want to register a hook and the hook
 function. Before the event arguments, an object with the properties `room`
 ({@link HhmRoomObject}) and `metadata` ({@link EventHandlerExecutionMetadata~Proxy})
-is passed to the hooks. Here's an example for pre-event handler hook:
+is passed to the hooks. Here's an example for a pre-event handler hook:
 
 ```javascript
 function onPlayerTeamChangePreEventHandlerHook({}, player) {
@@ -126,7 +126,7 @@ function onPlayerJoinEventStateValidator({}, player) {
 ```
 
 This is from the `sav/players` plugin and it uses the custom player property
-`offline` (which is set to false when a player leaves) to check if the player
+`online` (which is set to false when a player leaves) to check if the player
 is still in the room and returns `false` if the player is no longer online.
 The first argument to any event state validator is an object containing (currently)
 only one property `metadata`, which is an instance of {@link EventHandlerExecutionMetadata},
@@ -208,7 +208,7 @@ They have a less important role than pre-event handler hooks in that they are
 essentially handlers which are executed after the main event handler execution
 loop finishes. They are always executed regardless of event state validation. If
 you want to make sure your handler is executed but do not need it to be executed
-before the event handler execution look, register it as a post-event handler hook.
+before the event handler execution loop, register it as a post-event handler hook.
 
 ## HHM events
 
@@ -230,7 +230,7 @@ For example, a correct event handler for the event `eventHandlerSet` looks like
 this:
 
 ```javascript
-room.onHhm_eventHandlerSet = ({ plugin, handlerName, handlerFunction }) => {
+room.onHhm_eventHandlerSet = ({ plugin, handlerName, handler }) => {
   // Your event handler code
 };
 ```

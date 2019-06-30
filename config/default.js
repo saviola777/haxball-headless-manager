@@ -1,11 +1,31 @@
+/**
+ * This is the default HHM config. If you are using haxroomie, please consider
+ * using one of the configurations provided by the haxroomie project, this
+ * configuration will _not_ work with haxroomie.
+ */
+
 // Do not edit this block unless you know what you are doing
 
 HHM = typeof HHM === `undefined` ? {} : HHM;
-HHM.baseUrl = HHM.baseUrl || `https://haxplugins.tk/`;
 HHM.config = HHM.config || {};
-haxroomie = typeof haxroomie === `undefined` ? {} : haxroomie;
+hrConfig = typeof hrConfig === `undefined` ? {} : hrConfig;
 
 // Start editing here
+
+/**
+ * Choose your HHM version here, by default it points to the latest stable
+ * version.
+ *
+ * Possible values:
+ *
+ * - 'X.X.X': stable version
+ * - 'latest': always the latest stable version
+ * - 'git': some recent git build, likely to be broken
+ *
+ * This value is only taken into account if the HHM has not yet been loaded
+ * when this config is loaded.
+ */
+HHM.config.version = hrConfig.hhmVersion || `0.9.2`;
 
 /**
  * Include your room config here (the object that will be passed to HBInit).
@@ -16,13 +36,13 @@ haxroomie = typeof haxroomie === `undefined` ? {} : haxroomie;
  * Please only adjust values on the right side of '||'.
  */
 HHM.config.room = {
-  roomName: haxroomie.roomName || `haxroomie`,
-  playerName : haxroomie.playerName || `host`,
-  maxPlayers: haxroomie.maxPlayers || 16,
-  public : haxroomie.hasOwnProperty('public') ? haxroomie.public : false,
-  password: haxroomie.password,
-  geo: haxroomie.geo || {code: `FI`, lat: 60.192059, lon: 24.945831},
-  token: haxroomie.token || "insert your token here"
+  roomName: hrConfig.roomName || `haxroomie`,
+  playerName : hrConfig.playerName || `host`,
+  maxPlayers: hrConfig.maxPlayers || 16,
+  public : hrConfig.hasOwnProperty('public') ? hrConfig.public : false,
+  password: hrConfig.password,
+  geo: hrConfig.geo || {code: `FI`, lat: 60.192059, lon: 24.945831},
+  token: hrConfig.token || `insert your token here`
 };
 
 /**
@@ -54,14 +74,14 @@ HHM.config.postInit = HBInit => {
  * configuration objects or an empty object if you want to use the default
  * configuration.
  *
- * You can use haxroomie.someProperty || `your default value` to support config
- * overrides from Haxroomie.
+ * You can use hrConfig.someProperty || `your default value` to support config
+ * overrides from haxroomie.
  */
 HHM.config.plugins = {
   'sav/roles': {
     roles: {
       'host': ``,
-      'admin': haxroomie.adminPassword || 'haxroomie'
+      'admin': hrConfig.adminPassword || 'haxroomie'
     },
   },
   'sav/core': {},
@@ -91,13 +111,16 @@ HHM.config.plugins = {
  *
  *  - plain: plain HTTP(s) repository. Additional properties:
  *    - url: base URL for the repository
+ *  - local: local repository. Additional properties:
+ *    - plugins: mapping of plugin name to plugin code (string or function)
  *  - github: GitHub repository. Plugins must be organized like
  *    /${path}/auth/plugin-name.js in the repository. Additional
  *    properties:
  *    - repository: GitHub repository identifier, i.e. username/repoName
- *    - branch: branch within the repository, defaults to `master`
+ *    - version: commit, tag, or branch within the repository, defaults to
+ *      `master`
  *    - path: path to the repository root within the GitHub repository, no
- *      leading slash (optional, defaults to `src/`)
+ *      leading slash (optional, defaults to `src`)
  *
  * Plugins are loaded as text via $.ajax and then executed in a
  * new Function() context that receives a HBInit function, which can be used to
@@ -114,11 +137,18 @@ HHM.config.repositories = [
   },
 ];
 
+/**
+ * Log level for HHM, change this if you want more or less output.
+ *
+ * One of: trace, debug, info, warn, error, silent
+ */
+HHM.config.logLevel = hrConfig.hhmLogLevel || `info`;
+
 // Do not edit anything after this
 
 // Load HHM if it has not already been loaded
 if (HHM.manager === undefined) {
   let s = document.createElement(`script`);
-  s.src = `${HHM.baseUrl}/hhm.js`;
+  s.src = `https://hhm.surge.sh/releases/hhm-${HHM.config.version}.js`;
   document.head.appendChild(s);
 }

@@ -3,7 +3,6 @@ const PluginLoader = require(`./PluginLoader`);
 const TrappedRoomManager = require(`./TrappedRoomManager`);
 const { RoomTrapper } = require(`haxball-room-trapper`);
 const configError = new Error(`Invalid HHM configuration`);
-const startError = new Error(`Error during HHM start`);
 
 /**
  * PluginManager class, core of the HHM system.
@@ -402,13 +401,9 @@ class PluginManager {
       await this.addPluginByName(pluginName);
 
       if (!this.room.hasPlugin(pluginName)) {
-        HHM.log.error(`Unable to load user plugin: ${pluginName}`);
-        HHM.log.error(`HHM start aborted, please check your config`);
-        return false;
+        HHM.log.warn(`Unable to load user plugin: ${pluginName}`);
       }
     }
-
-    return true;
   }
 
   /**
@@ -1061,22 +1056,25 @@ class PluginManager {
     await HHM.deferreds.roomLink.promise();
 
     await this.addPlugin({ pluginName: `hhm/core` }) >= 0 ||
-        (() => { throw startError })();
+        (() => {throw new Error(
+            `Error during HHM start: unable to load hhm/core plugin`); })();
 
     if (typeof Storage !== `undefined`) {
       HHM.storage = HHM.storage || require(`../storage`);
 
       await this.addPlugin({ pluginName: `hhm/persistence` }) >= 0 ||
-          (() => { throw startError })();
+          (() => { throw new Error(`Error during HHM start: unable to load `
+            + `hhm/persistence plugin`); })();
     } else {
       HHM.log.warn(`No support for localStorage, persistence is disabled`);
     }
 
-    await this._loadUserPlugins() || (() => { throw startError })();
+    await this._loadUserPlugins();
 
     HHM.log.info(`Initial user plugins loaded and configured`);
 
-    await this._postInit() || (() => { throw startError })();
+    await this._postInit() || (() => {
+      throw new Error(`Error during HHM start, _postInit failed`); })();
 
     HHM.deferreds.managerStarted.resolve();
 

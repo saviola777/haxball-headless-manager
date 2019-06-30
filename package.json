@@ -21,6 +21,7 @@
   "dependencies": {
     "@natlibfi/loglevel-message-prefix": "NatLibFi/loglevel-message-prefix",
     "collections": "^5.1.2",
+    "deep-equal": "^1.0.1",
     "haxball-room-trapper": "morko/haxball-room-trapper",
     "jquery-browserify": "^1.8.1",
     "js-function-reflector": "saviola777/js-function-reflector",
@@ -30,7 +31,7 @@
   },
   "devDependencies": {
     "browserify": "^16.2.3",
-    "foodoc": "0.0.9",
-    "jsdoc": "^3.5.5"
+    "foodoc": "^0.0.9",
+    "jsdoc": "^3.6.2"
   }
 }

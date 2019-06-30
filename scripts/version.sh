@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 VERSION_STRING="`npm list | grep haxball-headless-manager | awk '{print $1}'`"
 GIT_HASH="`git rev-parse --short HEAD`"
 BUILD_DATE="`date +"%Y-%m-%d %H:%M:%S"`"

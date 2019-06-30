@@ -1,4 +1,23 @@
-# Version 0.9.1
+# Changelog
+
+## Version 0.9.2-git
+
+- first release which is deployed on [surge.sh](https://surge.sh)
+- adjust config to haxroomie update
+- remove baseUrl configuration directive
+- add version and logLevel configuration directives
+- change github repository handler config `branch` to `version`
+- add local repository support
+- remove support for CORS proxy
+- add `hasRepository` function to PluginLoader
+- the inability to load all user-specified plugins no longer leads to an error
+  during HHM start
+- better error reporting during HHM start
+- rename `handlerFunction` parameter to `handler` in preparation of support for
+  object handlers
+
+
+## Version 0.9.1
 
 - add JsDoc documentation to HHM code
 - add repository information in README and config
@@ -26,7 +45,7 @@
   objects will now be passed to handlers
 
 
-# Version 0.9.0
+## Version 0.9.0
 
 - ditch GUI, [haxroomie-web](https://github.com/morko/haxroomie-web) does a
   better job of it
@@ -43,7 +62,7 @@
 - `_postInit` plugin is now called `_user/postInit`
 - add custom event handlers `onEnable` and `onDisable`
 
-# Version 0.8.1
+## Version 0.8.1
 
 - fix npm dependencies to automatically install from github repositories where
   necessary (thanks [morko](https://github.com/morko))
@@ -57,7 +76,7 @@
 - add event system for HHM changes like plugins being added / disabled, which
   can also be used from within plugins
 
-# Version 0.8.0
+## Version 0.8.0
 
 - add support for event state validators and pre-event handler hooks, which help
   deal with problematic multi-handler situations
@@ -71,7 +90,7 @@
 - plugins have been moved to a [separate repository](https://github.com/saviola777/hhm-plugins)
 - refactoring!
 
-# Version 0.7.3
+## Version 0.7.3
 
 - add support for iterable (e.g. array) or object handlers
 - add [CORS Anywhere](https://github.com/Rob--W/cors-anywhere) proxy through
@@ -80,7 +99,7 @@
 - add `HHM.log.toRoom()`, which allows logging to both the room and the console
 - fix problem where plugins where sometimes loaded twice
 
-# Version 0.7.2
+## Version 0.7.2
 
 - refactor room and plugin manager interfaces to be more intuitive and clear
 - add custom event `onLoad` to give plugins a way to execute code once
@@ -89,7 +108,7 @@
   messages up to a maximum length defined in `HHM.config.sendChatMaxLength`
 - improve cron plugin, see its changelog
 
-# Version 0.7.1
+## Version 0.7.1
 
 - improve commands plugin (see plugins/saviola/commands.js for changelog)
 - fix a problem when trying to load a plugin that was already loaded
@@ -98,10 +117,10 @@
 - fix a problem that would not enable a plugin after it was disabled once
 
 
-# Version 0.7.0
+## Version 0.7.0
 
 - initial version
 - support for loading configuration file from URL or via upload
 - support for adding plugins via file, repository name or pasted source code
 - support for dependency management and execution order specification
-- experimental support for enabling / disabling plugins 
+- experimental support for enabling / disabling plugins
