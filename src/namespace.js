@@ -61,6 +61,7 @@ module.exports.populate = () => {
     FunctionReflector: require(`./classes/FunctionReflector`),
     PluginLoader: require(`./classes/PluginLoader`),
     PluginManager: require(`./classes/PluginManager`),
+    ...require(`./classes/repository`),
     TrappedRoomManager: require(`./classes/TrappedRoomManager`),
   };
 

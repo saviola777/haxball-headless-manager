@@ -3,6 +3,7 @@ const PluginLoader = require(`./PluginLoader`);
 const TrappedRoomManager = require(`./TrappedRoomManager`);
 const { RoomTrapper } = require(`haxball-room-trapper`);
 const configError = new Error(`Invalid HHM configuration`);
+const repository = require(`./repository`);
 
 /**
  * PluginManager class, core of the HHM system.
@@ -20,6 +21,8 @@ class PluginManager {
   constructor() {
     this._class = `PluginManager`;
     this.dependencies = {};
+    this.repositoryFactory = new repository.RepositoryFactory(
+        require(`../repository`));
   }
 
   /**
@@ -112,14 +115,14 @@ class PluginManager {
    * @private
    * @param {number} pluginId ID of the plugin.
    * @param {Array.<number>} loadStack `Array` of loaded plugin IDs
-   * @returns Promise<Array.<number>> Updated `loadStack` `Array`,
+   * @returns {Promise<Array.<number>>} Updated `loadStack` `Array`,
    *  boolean false indicates an error during plugin load, meaning all loaded
    *  plugins will be removed.
    */
   async _checkPluginAndLoadDependencies(pluginId, loadStack) {
     if (!this.hasPluginById(pluginId) || !this._checkPluginsCompatible()) {
 
-      this._removePlugin(pluginId);
+      this.removePlugin(pluginId);
       loadStack.push(false);
       return loadStack;
     }
@@ -158,11 +161,11 @@ class PluginManager {
     if (!dependencySuccess) {
       for (let dependency of pluginSpec.dependencies) {
         if (dependenciesAlreadyLoaded.indexOf(dependency) === -1) {
-          this._removePlugin(this.getPluginId(dependency));
+          this.removePlugin(this.getPluginId(dependency));
         }
       }
 
-      this._removePlugin(pluginId);
+      this.removePlugin(pluginId);
 
       loadStack.push(false);
     }
@@ -246,6 +249,25 @@ class PluginManager {
     }
 
     return result;
+  }
+
+  /**
+   * Creates the initial user repositories.
+   */
+  async _createInitialRepositories(userRepositoryConfigs) {
+    const repositories = [];
+
+    for (let i = 0; i < userRepositoryConfigs.length; i++) {
+      try {
+        repositories.push(await this.repositoryFactory.createRepository(
+            userRepositoryConfigs[i]));
+      } catch (e) {
+        HHM.log.error(`Error during repository creation for user repository at `
+          + `index ${i}. ${e.name}: ${e.message}`);
+      }
+    }
+
+    return repositories;
   }
 
   /**
@@ -452,12 +474,11 @@ class PluginManager {
   /**
    * Removes the room proxy for the given plugin.
    *
-   * @function PluginManager#_removePlugin
-   * @private
+   * @function PluginManager#removePlugin
    * @param {number} pluginId ID of the plugin to be removed.
    * @returns {boolean} Whether the removal was successful.
    */
-  _removePlugin(pluginId) {
+  removePlugin(pluginId) {
 
     if (!this.hasPluginById(pluginId)) return false;
 
@@ -499,11 +520,11 @@ class PluginManager {
    *
    * @function PluginManager#addPluginByName
    * @param {string} pluginName Name of the plugin.
-   * @returns {number} Plugin ID if the plugin and all of its dependencies have
-   * been loaded, -1 otherwise.
+   * @returns {Promise.<number>} Plugin ID if the plugin and all of its
+   *  dependencies have been loaded, -1 otherwise.
    */
   async addPluginByName(pluginName) {
-    return await this.addPlugin({ pluginName });
+    return this.addPlugin({ pluginName });
   }
 
   /**
@@ -516,11 +537,11 @@ class PluginManager {
    * @param {(Function|string)} pluginCode Plugin code as `Function` or
    *  `string`.
    * @param {string} pluginName Name of the plugin.
-   * @returns {number} Plugin ID if the plugin and all of its dependencies have
-   * been loaded, -1 otherwise.
+   * @returns {Promise.<number>} Plugin ID if the plugin and all of its
+   *  dependencies have been loaded, -1 otherwise.
    */
   async addPluginByCode(pluginCode, pluginName) {
-    return await this.addPlugin({ pluginName, pluginCode });
+    return this.addPlugin({ pluginName, pluginCode });
   }
 
   /**
@@ -529,26 +550,11 @@ class PluginManager {
    * @function PluginManager#addPluginByUrl
    * @param {string} pluginUrl URL from which to load the plugin
    * @param {string} [pluginName] Optional plugin name
+   * @returns {Promise.<number>} Plugin ID if the plugin and all of its
+   *  dependencies have been loaded, -1 otherwise.
    */
   async addPluginByUrl(pluginUrl, pluginName) {
-    return await this.addPlugin({ pluginUrl, pluginName });
-  }
-
-  /**
-   * Adds a plugin repository.
-   *
-   * Convenience wrapper around {@link PluginLoader#addRepository}.
-   *
-   * @function PluginManager#addRepository
-   * @param {(string|Object)} repository The repository to be added, as `string`
-   *  or `Object`.
-   * @param {boolean} [append] Whether to append or prepend the repository to
-   *  the `Array` of repositories.
-   * @returns {boolean} Whether the repository was successfully added.
-   * @see PluginLoader#addRepository
-   */
-  addRepository(repository, append  = false) {
-    return this.pluginLoader.addRepository(repository, append);
+    return this.addPlugin({ pluginUrl, pluginName });
   }
 
   /**
@@ -814,6 +820,13 @@ class PluginManager {
   }
 
   /**
+   * TODO documentation
+   */
+  getPluginRepositoryFactory() {
+    return this.repositoryFactory;
+  }
+
+  /**
    * Returns the trapped room manager.
    *
    * @function PluginManager#getRoomManager
@@ -1024,14 +1037,14 @@ class PluginManager {
    *
    * @function PluginManager#start
    * @param {external:native-api.RoomObject} [room] Existing room object.
-   * @returns {HhmRoomObject} Extended or newly created room object.
+   * @returns {Promise.<(HhmRoomObject|boolean)>} Extended or newly created room
+   *  object or false if no config was loaded.
    */
   async start(room) {
     room = this._provideRoom(room);
 
     if (HHM.config === undefined) {
-      HHM.log.error(`No configuration loaded`);
-      return;
+      return false;
     }
 
     HHM.log.info(`HHM bootstrapping complete, config loaded`);
@@ -1046,10 +1059,10 @@ class PluginManager {
 
     this.roomTrapper = new RoomTrapper(new TrappedRoomManager(this.room));
 
-    this.pluginLoader = new PluginLoader(this.room,
-        HHM.config.repositories || []);
-
     this._initializeCoreEventHandlers();
+
+    this.pluginLoader = new PluginLoader(this.room,
+        await this._createInitialRepositories(HHM.config.repositories || []));
 
     HHM.log.info(`Waiting for room link`);
 

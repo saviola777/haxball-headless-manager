@@ -15,7 +15,7 @@ const localForage = require(`localforage`);
  * @alias module:src/storage.create
  */
 async function createStorage(config) {
-  return await localForage.createInstance(config);
+  return localForage.createInstance(config);
 }
 
 module.exports.create = createStorage;
