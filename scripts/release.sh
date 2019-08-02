@@ -8,4 +8,5 @@ then
 else
   echo "Releasing stable $VERSION"
   cp dist/.local/hhm-testing.js dist/releases/hhm-$VERSION.js
+  cp dist/.local/hhm-testing.js dist/releases/hhm-latest.js
 fi

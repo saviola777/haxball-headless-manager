@@ -2,7 +2,7 @@
  * Built-in repository type handlers for the RepositoryFactory.
  *
  * Further handlers can be added using
- * `HHM.manager.getPluginRepositoryFactory.addRepositoryTypeHandler()`
+ * `HHM.manager.getPluginRepositoryFactory().addRepositoryTypeHandler()`
  * later on.
  *
  * @module src/repository
@@ -10,64 +10,39 @@
  * @see repository.RepositoryTypeHandler
  */
 
-
-const seed =  Math.floor((Math.random() * 10000) + 1);
-const hash = require(`../hash`);
-
-/**
- * Plain repository handler.
- *
- * @alias module:src/repository.plain
- * @param {string} [suffix] File name suffix, defaults to `.js`.
- * @param {string} url Base repository URL.
- * @param {string} pluginName Plugin name.
- * @returns {(string|boolean)} Plugin URL or false if no base URL given.
- */
-function plainRepositoryTypeHandler({ suffix = `.js`, url } = {},
-                                pluginName) {
-  if (url === undefined || pluginName === undefined) return false;
-
-  if (!url.endsWith(`/`)) url += `/`;
-
-  return url + pluginName + suffix;
-}
-
-/**
- * Local repository handler.
- *
- * @alias module:src/repository.local
- * @param {Object.<string,(string|Function)>} plugins Repository mapping plugin
- *  names to plugin code (as string or Function).
- * @param {string} pluginName Plugin name.
- * @returns {(string|boolean|Function)} Plugin representation or empty string if
- *  the plugin could not be loaded or false if the load or pluginName were
- *  invalid.
- */
-function localRepositoryTypeHandler({ plugins } = {}, pluginName) {
-  if (typeof plugins !== `object` || pluginName === undefined) return false;
-
-  return plugins[pluginName] || "";
-}
+const repository = require(`./classes/repository`);
 
 /**
  * GitHub repository handler.
+ *
+ * Configuration:
+ *
+ *  - repository: required parameter (GitHub repository, e.g. "user/repo")
+ *  - path: directory that contains the plugins (default: "src")
+ *  - suffix: file type of the plugins (default: ".js")
+ *  - version: branch, tag, or commit of the repository (default: "master")
  *
  * @alias module:src/repository.github
  */
 const github = {
 
   /**
-   * GitHub repository handler.
+   * Loads the given plugin from the given GitHub repository.
    *
-   * @alias module:src/repository.github
+   * @function repository.github.getPluginSource
+   * @async
    * @param {repository.Repository} repository Repository object.
    * @param {string} pluginName Plugin name.
+   * @throws repository.RepositoryTypeError If a non-github repository is given.
    * @returns {Promise.<(string|boolean)>} Plugin URL or false if plugin not
    *  available in the repository or some other error happened while trying to
    *  load the plugin.
    *
    */
   getPluginSource: async (repository, pluginName) => {
+    if (repository.type !== `github`) {
+      throw new repository.RepositoryTypeError(repository.type);
+    }
 
     let { "repository": repositoryName, path, suffix, version }
         = repository.getConfiguration();
@@ -98,6 +73,12 @@ const github = {
     return pluginSource;
   },
 
+  /**
+   * Returns GitHub repository configuration defaults.
+   *
+   * @function repository.github.getConfigurationDefaults
+   * @returns {object.<*>} GitHub repository configuration defaults.
+   */
   getRepositoryConfigurationDefaults: () => {
     return {
       path: `src`,
@@ -107,7 +88,23 @@ const github = {
     };
   },
 
+  /**
+   * Returns GitHub repository information.
+   *
+   * The handler will load the contents of the file "respository.json" in the
+   * root of the GitHub repository.
+   *
+   * The version parameter will be appended to the repository name. If no
+   * custom repository name is specified, the GitHub repository name is used.
+   *
+   * @function repository.github.getRepositoryInformation
+   * @throws repository.RepositoryTypeError If a non-github repository is given.
+   * @returns {repository.RepositoryInformation} GitHub repository information.
+   */
   getRepositoryInformation: async (repository) =>  {
+    if (repository.type !== `github`) {
+      throw new repository.RepositoryTypeError(repository.type);
+    }
 
     let { "repository": repositoryName, version }
         = repository.getConfiguration();
@@ -144,20 +141,33 @@ const github = {
 /**
  * Local repository handler.
  *
+ * A local repository is a self-contained repository which defines all plugins
+ * in its configuration.
+ *
+ * Configuration:
+ *
+ *  - plugins: required object that maps plugin names to plugin source (string
+ *    or functions)
+ *  - repositoryInformation: optional repository information object
+ *
  * @alias module:src/repository.local
  */
 const local = {
   /**
-   * Local repository handler.
+   * Loads the given plugin from the given local repository.
    *
-   * @alias module:src/repository.local
+   * @function module:src/repository.local.getPluginSource
+   * @async
    * @param {repository.Repository} repository Repository object.
    * @param {string} pluginName Plugin name.
+   * @throws repository.RepositoryTypeError If a non-local repository is given.
    * @returns {Promise.<(string|boolean)>} Plugin code or false if plugin not
    *  available in the repository.
-   *
    */
   getPluginSource: async (repository, pluginName) => {
+    if (repository.type !== `local`) {
+      throw new repository.RepositoryTypeError(repository.type);
+    }
 
     if (pluginName === undefined) return false;
 
@@ -170,14 +180,31 @@ const local = {
     return false;
   },
 
+  /**
+   * Returns the local repository configuration defaults.
+   *
+   * @function module:src/repository.local.getRepositoryConfigurationDefaults
+   * @returns {object.<*>} Repository configuration defaults.
+   */
   getRepositoryConfigurationDefaults: () => {
     return {
-      name: hash(new Date().toString(), seed),
+      name: new Date().toString(),
       plugins: null
     };
   },
 
+  /**
+   * Returns the local repository information.
+   *
+   * @function module:src/repository.local.getRepositoryInformation
+   * @async
+   * @throws repository.RepositoryTypeError If a non-local repository is given.
+   * @returns {Promise.<repository.RepositoryInformation>} Repository information.
+   */
   getRepositoryInformation: async (repository) =>  {
+    if (repository.type !== `local`) {
+      throw new repository.RepositoryTypeError(repository.type);
+    }
 
     let { name, plugins, repositoryInformation } = repository.getConfiguration();
 
@@ -187,18 +214,39 @@ const local = {
   },
 };
 
+/**
+ * Plain repository handler.
+ *
+ * A plain repository is a repository that consists of plugins being loaded
+ * from a base url plus the plugin name plus a file type.
+ *
+ * The repository information is loaded from the file "repository.json" below
+ * the base URL.
+ *
+ * Configuration:
+ *
+ *  - suffix: file type (default: ".js")
+ *  - url: required base URL
+ *
+ * @alias module:src/repository.plain
+ */
 const plain = {
   /**
-   * Plain URL repository handler.
+   * Loads the given plugin from the given plain repository.
    *
-   * @alias module:src/repository.plain
+   * @function module:src/repository.plain.getPluginSource
+   * @async
    * @param {repository.Repository} repository Repository object.
    * @param {string} pluginName Plugin name.
+   * @throws repository.RepositoryTypeError If a non-plain repository is given.
    * @returns {Promise.<(string|boolean)>} Plugin URL or false if no plugin
    *  name was specified.
-   *
    */
   getPluginSource: async (repository, pluginName) => {
+    if (repository.type !== `plain`) {
+      throw new repository.RepositoryTypeError(repository.type);
+    }
+
     if (pluginName === undefined) return false;
 
     let { suffix, url } = repository.getConfiguration();
@@ -208,6 +256,13 @@ const plain = {
     return url + pluginName + suffix;
   },
 
+  /**
+   * Loads the given plugin from the given plain repository.
+   *
+   * @function module:src/repository.plain.getRepositoryConfigurationDefaults
+   * @throws repository.RepositoryTypeError If a non-plain repository is given.
+   * @returns {object.<*>} Repository configuration object.
+   */
   getRepositoryConfigurationDefaults: () => {
     return {
       suffix: `.js`,
@@ -215,7 +270,20 @@ const plain = {
     };
   },
 
+  /**
+   * Loads the given plugin from the given plain repository.
+   *
+   * @function module:src/repository.plain.getPluginSource
+   * @async
+   * @param {repository.Repository} repository Repository object.
+   * @throws repository.RepositoryTypeError If a non-plain repository is given.
+   * @returns {Promise.<repository.RepositoryInformation>} Repository
+   *  information object.
+   */
   getRepositoryInformation: async (repository) =>  {
+    if (repository.type !== `plain`) {
+      throw new repository.RepositoryTypeError(repository.type);
+    }
 
     let { url } = repository.getConfiguration();
 
@@ -257,11 +325,6 @@ module.exports = RepositoryTypeHandlers;
  *
  * Each repository handler has to implement the functions shown here and
  * be registered with the {@link repository.RepositoryFactory}.
- *
- * It is assumed that whenever `repositoryConfiguration` objects are passed to
- * one of the RepositoryTypeHandler functions, the defaults returned from
- * {@link repository.RepositoryTypeHandler.getRepositoryConfigurationDefaults}
- * are already merged in.
  *
  * @namespace repository.RepositoryTypeHandler
  */
@@ -314,5 +377,5 @@ module.exports = RepositoryTypeHandlers;
  * @property {string} name Repository name.
  * @property {string} [description] Repository description
  * @property {string} [author] Author(s) of the plugins in this repository.
- * @property {array.<string>} [plugins] Plugins contained in the repository.
+ * @property {Array.<string>} [plugins] Plugins contained in the repository.
  */

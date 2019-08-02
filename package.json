@@ -1,6 +1,6 @@
 {
   "name": "@saviola777/haxball-headless-manager",
-  "version": "0.9.3-git",
+  "version": "0.9.3",
   "description": "Plugin manager for headless HaxBall hosts.",
   "main": "index.js",
   "repository": {
@@ -28,11 +28,13 @@
     "json-stable-stringify": "^1.0.1",
     "localforage": "^1.7.3",
     "loglevel": "^1.6.1",
-    "toposort": "^2.0.2"
+    "toposort": "^2.0.2",
+    "lodash.merge": "^4.6.2"
   },
   "devDependencies": {
     "browserify": "^16.2.3",
     "foodoc": "^0.0.9",
-    "jsdoc": "^3.6.2"
+    "jsdoc": "^3.6.3",
+    "surge": "^0.21.3"
   }
 }
