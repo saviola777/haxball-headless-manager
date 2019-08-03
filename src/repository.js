@@ -10,7 +10,7 @@
  * @see repository.RepositoryTypeHandler
  */
 
-const repository = require(`./classes/repository`);
+const repositoryClasses = require(`./classes/repository`);
 
 /**
  * GitHub repository handler.
@@ -40,8 +40,9 @@ const github = {
    *
    */
   getPluginSource: async (repository, pluginName) => {
-    if (repository.type !== `github`) {
-      throw new repository.RepositoryTypeError(repository.type);
+
+    if (repository.getType() !== `github`) {
+      throw new repositoryClasses.RepositoryTypeError(repository.getType());
     }
 
     let { "repository": repositoryName, path, suffix, version }
@@ -102,8 +103,9 @@ const github = {
    * @returns {repository.RepositoryInformation} GitHub repository information.
    */
   getRepositoryInformation: async (repository) =>  {
-    if (repository.type !== `github`) {
-      throw new repository.RepositoryTypeError(repository.type);
+
+    if (repository.getType() !== `github`) {
+      throw new repositoryClasses.RepositoryTypeError(repository.getType());
     }
 
     let { "repository": repositoryName, version }
@@ -165,8 +167,9 @@ const local = {
    *  available in the repository.
    */
   getPluginSource: async (repository, pluginName) => {
-    if (repository.type !== `local`) {
-      throw new repository.RepositoryTypeError(repository.type);
+
+    if (repository.getType() !== `local`) {
+      throw new repositoryClasses.RepositoryTypeError(repository.getType());
     }
 
     if (pluginName === undefined) return false;
@@ -202,11 +205,13 @@ const local = {
    * @returns {Promise.<repository.RepositoryInformation>} Repository information.
    */
   getRepositoryInformation: async (repository) =>  {
-    if (repository.type !== `local`) {
-      throw new repository.RepositoryTypeError(repository.type);
+
+    if (repository.getType() !== `local`) {
+      throw new repositoryClasses.RepositoryTypeError(repository.getType());
     }
 
-    let { name, plugins, repositoryInformation } = repository.getConfiguration();
+    let { name, plugins, repositoryInformation }
+      = repository.getConfiguration();
 
     let pluginNames = Object.getOwnPropertyNames(plugins);
 
@@ -243,13 +248,16 @@ const plain = {
    *  name was specified.
    */
   getPluginSource: async (repository, pluginName) => {
-    if (repository.type !== `plain`) {
-      throw new repository.RepositoryTypeError(repository.type);
+
+    if (repository.getType() !== `plain`) {
+      throw new repositoryClasses.RepositoryTypeError(repository.getType());
     }
+
+    let { suffix, url } = repository.getConfiguration();
 
     if (pluginName === undefined) return false;
 
-    let { suffix, url } = repository.getConfiguration();
+
 
     if (!url.endsWith(`/`)) url += `/`;
 
@@ -281,8 +289,9 @@ const plain = {
    *  information object.
    */
   getRepositoryInformation: async (repository) =>  {
-    if (repository.type !== `plain`) {
-      throw new repository.RepositoryTypeError(repository.type);
+
+    if (repository.getType() !== `plain`) {
+      throw new repositoryClasses.RepositoryTypeError(repository.getType());
     }
 
     let { url } = repository.getConfiguration();

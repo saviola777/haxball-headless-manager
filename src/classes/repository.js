@@ -16,6 +16,7 @@ class Repository {
     // TODO Update config from handler?
     this.userRepositoryConfig = userRepositoryConfig;
     this.handler = handler;
+    this.type = handler.type;
 
     this.repositoryConfig = $.extend({},
         this.handler.getRepositoryConfigurationDefaults(),
@@ -136,6 +137,13 @@ class Repository {
   /**
    * TODO documentation
    */
+  getType() {
+    return this.type;
+  }
+
+  /**
+   * TODO documentation
+   */
   getUserConfiguration() {
     return this.userRepositoryConfig;
   }
@@ -178,7 +186,7 @@ class RepositoryFactory {
     }
 
     // TODO check .type, add handler, warning if replace?
-    this.repositoryTypeHandlers[type] = handler;
+    this.repositoryTypeHandlers[type] = $.extend(handler, { type });
   }
 
   /**
