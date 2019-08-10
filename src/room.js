@@ -17,29 +17,9 @@ module.exports.createRoom = function(room, pluginManager) {
     _class: `HhmRoomObject`,
 
     /**
-     * Maps plugin IDs to trapped room instances.
-     *
-     * @member {Object.<Number, external:haxball-room-trapper.TrappedRoom>}
-     *  HhmRoomObject#_plugins
-     */
-    _plugins: {},
-
-    /**
-     * `Array` of disabled plugin IDs.
-     *
-     * @member {Array.<Number>} HhmRoomObject#_pluginsDisabled
-     */
-    _pluginsDisabled: [],
-
-    /**
-     * Maps plugin names to plugin IDs.
-     *
-     * @member {Object.<String, Number>} HhmRoomObject#_pluginIds
-     */
-    _pluginIds: {},
-
-    /**
      * Associated plugin manager.
+     *
+     * TODO move plugins, pluginIds and pluginsDisabled to plugin manager?
      *
      * @member {PluginManager} HhmRoomObject#_pluginManager
      */
@@ -294,6 +274,28 @@ module.exports.createRoom = function(room, pluginManager) {
     },
 
     /**
+     * Returns the room manager for this plugin.
+     *
+     * @returns {TrappedRoomManager} Room manager object.
+     */
+    getRoomManager: function() {
+      return pluginManager.getRoomManager();
+    },
+
+    /**
+     * Returns the internal event handler object.
+     *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @returns {(object.<*>|undefined)} Event handler object or undefined.
+     * @see TrappedRoomManager#getEventHandlerObject
+     */
+    getEventHandlerObject: function(handlerName) {
+      return pluginManager.getRoomManager().getEventHandlerObject(this._id,
+          handlerName);
+    },
+
+    /**
      * Returns the plugin source code.
      *
      * @memberOf HhmRoomObject
@@ -348,7 +350,7 @@ module.exports.createRoom = function(room, pluginManager) {
      */
     isEnabled: function() {
       return this.isLoaded()
-          && pluginManager.room._pluginsDisabled.indexOf(this._id) === -1;
+          && pluginManager.pluginsDisabled.indexOf(this._id) === -1;
     },
 
     /**

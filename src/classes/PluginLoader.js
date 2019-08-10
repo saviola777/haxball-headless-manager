@@ -10,15 +10,15 @@ const hashSeed = 14868;
  * @property {HhmRoomObject} room Room object.
  * @property {Object.<string, Function>} repositoryTypeHandlers Handler
  *  functions for different repository types, see
- *  {@link module:src/repositories}.
+ *  {@link module:src/repository}.
  */
 class PluginLoader {
 
-  constructor(room, repositories) {
+  constructor(room, initialRepositories) {
     this._class = `PluginLoader`;
     this.room = room;
 
-    this.initializeRepositories(repositories);
+    this.initializeRepositories(initialRepositories);
   }
 
   /**
@@ -90,8 +90,8 @@ class PluginLoader {
    * removing all existing repositories.
    *
    * @function PluginLoader#initializeRepositories
-   * @param {repository.Repository} repositories Array of repositories, as
-   *  strings or objects.
+   * @param {Array.<repository.Repository>} repositories Array of repositories,
+   *  as strings or objects.
    * @see module:src/repositories
    */
   initializeRepositories(repositories) {
@@ -169,6 +169,7 @@ class PluginLoader {
    * functions.
    *
    * @function PluginLoader#tryToLoadPlugin
+   * @async
    * @param {string} [pluginName] Plugin name.
    * @param {(string|Function)} [pluginCode] Plugin code as string or function.
    * @param {string} [pluginUrl] URL to the raw plugin source (CORS headers
@@ -219,6 +220,7 @@ class PluginLoader {
    * Tries to load the given plugin from the configured repositories.
    *
    * @function PluginLoader#_tryToLoadPluginByName
+   * @async
    * @private
    * @param {string} pluginName Name of the plugin to be loaded.
    * @returns {Promise.<number>} The ID of the plugin or -1 if it couldn't be loaded.

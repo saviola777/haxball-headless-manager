@@ -1,3 +1,4 @@
+const merge = require('lodash.merge');
 const toposort = require(`toposort`);
 const EventHandlerExecutionMetadata = require(`./EventHandlerExecutionMetadata`);
 
@@ -42,18 +43,25 @@ class TrappedRoomManager {
     const that = this;
     this._class = `TrappedRoomManager`;
 
+    // TODO turn into map
     this.eventStateValidators = {};
     this.functionReflector = new HHM.classes.FunctionReflector(
         Math.floor((Math.random() * 10000) + 1));
 
+    // TODO turn into map
     this.handlerExecutionOrders = {};
     this.handlerNames = new Set();
+
+    // TODO turn into map
     this.handlers = {};
     this.handlersDirty = true;
 
+    // TODO turn into map
     this.postEventHandlerHooks = {};
+    // TODO turn into map
     this.preEventHandlerHooks = {};
 
+    // TODO turn into map
     this.properties = {};
 
     this.room = room;
@@ -111,50 +119,83 @@ class TrappedRoomManager {
   }
 
   /**
+   * Returns a handler object for the given handler object or function.
+   *
+   * This function creates a new handler object if a handler function is given
+   * or otherwise extends the given handler object.
+   *
+   * @function TrappedRoomManager#_createHandlerObject
+   * @private
+   * @param {(Function|object)} handler Event handler function or object.
+   * @returns {object} Event handler object.
+   */
+  _createHandlerObject(handler) {
+
+    let handlerObject = handler;
+
+    let handlerObjectDefaults = {
+      functions: handler,
+      meta: {
+        userHandler: handler,
+      },
+      plugins: {
+
+      },
+    };
+
+    return merge({}, handlerObjectDefaults, handlerObject);
+  }
+
+  /**
    * Executes the given handler.
    *
    * @function TrappedRoomManager#_executeHandler
    * @private
-   * @param {(Function|Object|Array)} handler The handler function, or
+   * @param {(Function|Object|Array)} handlerFunctions The handler function, or
    *  collection of functions in an iterable object.
+   * @param {object.<*>} handlerObject Handler object.
    * @param {string} pluginName Name of the plugin.
    * @param {EventHandlerExecutionMetadata} metadata Event metadata.
    * @param {...*} args Event arguments.
    */
-  _executeHandler(handler, pluginName, metadata, ...args) {
-    if (typeof handler === `function`) {
+  _executeHandler(handlerFunctions, handlerObject, pluginName, metadata, ...args) {
+    // TODO do we expect a non object handler?
+    if (typeof handlerFunctions === `function`) {
       let extraArgsPosition = this.functionReflector
-          .getArgumentInjectionPosition(handler, args);
+          .getArgumentInjectionPosition(handlerFunctions, args);
 
       if (extraArgsPosition >= 0) {
         args = args.concat(Array(Math.max(0, extraArgsPosition - args.length))
-            .fill(undefined)).concat(metadata.forPlugin(pluginName));
+            .fill(undefined))
+            .concat(metadata.forPlugin(pluginName, handlerObject));
       }
 
       try {
-        metadata.registerReturnValue(pluginName, handler(...args));
+        // TODO execute function on the handler object
+        metadata.registerReturnValue(pluginName, handlerFunctions(...args));
       } catch (e) {
         HHM.log.error(`Error during execution of handler ` +
             `${metadata.handlerName} for plugin ${pluginName}`);
         HHM.log.error(e);
       }
     }
-     else if (typeof handler !== `object`) {
+     else if (typeof handlerFunctions !== `object`) {
       // TODO support string handlers?
-      HHM.log.warn(`Invalid handler type: ${typeof handler}`);
+      HHM.log.warn(`Invalid handler type: ${typeof handlerFunctions}`);
     }
 
     // Iterable
-    else if (typeof handler[Symbol.iterator] === `function`) {
-      for (let h of handler) {
-        this._executeHandler(h, pluginName, metadata, ...args);
+    else if (typeof handlerFunctions[Symbol.iterator] === `function`) {
+      for (let h of handlerFunctions) {
+        this._executeHandler(h, handlerObject, pluginName, metadata, ...args);
       }
     }
 
     else {
       // Object iteration
       for (let h of Object.getOwnPropertyNames(handler)) {
-        this._executeHandler(handler[h], pluginName, metadata, ...args);
+        this._executeHandler(handlerFunctions[h], handlerObject, pluginName,
+            metadata, ...args);
       }
     }
   }
@@ -303,6 +344,7 @@ class TrappedRoomManager {
       let pluginName = this.room._pluginManager.getPluginById(pluginId)._name;
 
       HHM.log.error(`There was a cyclic dependency for handler ${handlerName} and plugin ${pluginName}`);
+      // TODO
       //HHM.log.error(this.room._pluginManager._createDependencyChain(pluginId, []));
       throw(e);
     }
@@ -320,7 +362,7 @@ class TrappedRoomManager {
       let pluginIds = [];
 
       // Collect plugins for current handler
-      for (let pluginId of Object.getOwnPropertyNames(this.room._plugins)) {
+      for (let pluginId of this.room._pluginManager.plugins.keys()) {
         this._provideHandlerObjectForIdentifier(pluginId);
 
         if (this.handlers[pluginId].hasOwnProperty(handlerName)) {
@@ -353,6 +395,35 @@ class TrappedRoomManager {
     this._provideHandlerObjectForIdentifier(pluginId);
 
     return Object.getOwnPropertyNames(this.handlers[pluginId]);
+  }
+
+  /**
+   * Returns the internal event handler object for the given plugin and handler
+   * name or undefined if no such handler exists.
+   *
+   * @function TrappedRoomManager#getEventHandlerObject
+   * @param {number} pluginId Plugin ID.
+   * @param {string} handlerName Event handler name.
+   * @returns {(object.<*>|undefined)} Event handler object or undefined.
+   */
+  getEventHandlerObject(pluginId, handlerName) {
+    return (this.handlers[pluginId] || {})[handlerName];
+  }
+
+  /**
+   * Returns the event handler objects of all plugins for the given handler
+   * name.
+   *
+   * @function TrappedRoomManager#getEventHandlerObjects
+   * @param {string} handlerName Event handler name.
+   * @returns {object.<number, object.<*>>} Event handler objects by plugin ID.
+   */
+  getEventHandlerObjects(handlerName) {
+    return Object.getOwnPropertyNames(this.handlers)
+        .filter((pluginId) => this.handlers[pluginId][handlerName] !== undefined)
+        .map((pluginId) => [pluginId, this.handlers[pluginId][handlerName]])
+        .reduce((result, currentValue) =>
+          result[currentValue[0]] = currentValue[1], {});
   }
 
   /**
@@ -412,6 +483,11 @@ class TrappedRoomManager {
    * Returns the event handler registered for the given handler and plugin ID,
    * or undefined if none is registered.
    *
+   * Note that this always returns exactly what the plugin author assigned as
+   * the handler, to avoid unexpected behavior. If you want to access the
+   * internal event handler, use {@link TrappedRoomManager#getEventHandlerObject}
+   * instead which is available as {@link HhmRoomObject#getEventHandlerObject}.
+   *
    * @function TrappedRoomManager#onEventHandlerGet
    * @param {*} _ Unused.
    * @param {string} handlerName Name of the event handler.
@@ -421,8 +497,10 @@ class TrappedRoomManager {
    */
   onEventHandlerGet(_, handlerName, pluginId) {
     this._provideHandlerObjectForIdentifier(pluginId);
-    
-    return this.handlers[pluginId][handlerName];
+
+    if (this.handlers[pluginId][handlerName] !== undefined) {
+      return this.handlers[pluginId][handlerName].meta.userHandler;
+    }
   }
 
   /**
@@ -451,20 +529,20 @@ class TrappedRoomManager {
    * @function TrappedRoomManager#onEventHandlerSet
    * @param {*} _ Unused.
    * @param {string} handlerName Event handler name.
-   * @param {*} handler Event handler function or object
+   * @param {(object|Function)} handler Event handler function or object
    * @param {number} pluginId Plugin ID.
    */
   onEventHandlerSet(_, handlerName, handler, pluginId) {
     this._provideHandlerObjectForIdentifier(pluginId);
     this.handlerNames.add(handlerName);
 
-    this.handlers[pluginId][handlerName] = handler;
+    this.handlers[pluginId][handlerName] = this._createHandlerObject(handler);
 
     this.handlersDirty = true;
 
     this.room._pluginManager.triggerHhmEvent(HHM.events.EVENT_HANDLER_SET, {
-      handler: handler,
-      handlerName: handlerName,
+      handler: this.handlers[pluginId][handlerName],
+      handlerName,
       plugin: this.room._pluginManager.getPluginById(pluginId),
     });
   }
@@ -480,6 +558,7 @@ class TrappedRoomManager {
   onEventHandlerUnset(_, handlerName, pluginId) {
     this._provideHandlerObjectForIdentifier(pluginId);
 
+    // TODO retain handler object, but set to deleted?
     const handler = this.handlers[pluginId][handlerName];
     const plugin = this.room._pluginManager.getPluginById(pluginId);
 
@@ -623,7 +702,8 @@ class TrappedRoomManager {
     if (this.preEventHandlerHooks[handlerName] !== undefined) {
 
       for (let pluginId of
-          Object.getOwnPropertyNames(this.preEventHandlerHooks[handlerName])) {
+          Object.getOwnPropertyNames(this.preEventHandlerHooks[handlerName])
+              .map((id) => parseInt(id))) {
 
         if (!this._isPluginEnabledAndLoaded(pluginId)) {
           continue;
@@ -662,7 +742,8 @@ class TrappedRoomManager {
           break;
         }
 
-        this._executeHandler(this.handlers[pluginId][handlerName],
+        this._executeHandler(this.handlers[pluginId][handlerName].functions,
+            this.handlers[pluginId][handlerName],
             this.room._pluginManager.getPluginName(pluginId), metadata,
                 ...args);
       }
@@ -671,7 +752,7 @@ class TrappedRoomManager {
     // Execute post-event handler hooks
     if (this.postEventHandlerHooks[handlerName] !== undefined) {
       for (let pluginId of Object.getOwnPropertyNames(
-          this.postEventHandlerHooks[handlerName])) {
+          this.postEventHandlerHooks[handlerName]).map((id) => parseInt(id))) {
 
         if (!this._isPluginEnabledAndLoaded(pluginId)) {
           continue;
@@ -768,7 +849,7 @@ class TrappedRoomManager {
   /**
    * Removes the handlers and properties for the given plugin ID.
    *
-   * Must be called by PluginManager#_removePlugin to ensure overall
+   * Must be called by {@link PluginManager#removePlugin} to ensure overall
    * consistency.
    *
    * @function TrappedRoomManager#removePluginHandlersAndProperties

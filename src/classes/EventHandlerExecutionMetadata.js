@@ -5,12 +5,12 @@
  *  execution, this value is `true` until the first (pre) event handler returns
  *  `false`, and cannot change back to `true` afterwards.
  * @property {string} handlerName Name of the executed event handlers.
- * @property {Object.<string, Array.<*>>} handlerReturnValues Array of return
+ * @property {Map.<string, Array.<*>>} handlerReturnValues Array of return
  *  values of handlers by plugin name. Return values can be `boolean` as well as
  *  complex types.
  * @property {Array.<string>} handlerPlugins Array of plugins which have
  *  handled this event.
- * @property {Object.<string, *>} data Additional custom event handling
+ * @property {Map.<string, *>} data Additional custom event handling
  *  metadata.
  *
  * @class EventHandlerExecutionMetadata
@@ -20,9 +20,9 @@ class EventHandlerExecutionMetadata {
     this._class = `EventHandlerExecutionMetadata`;
     this.returnValue = true;
     this.handlerName = handlerName;
-    this.handlerReturnValues = {};
+    this.handlerReturnValues = new Map();
     this.handlerPlugins = [];
-    this.data = {};
+    this.data = new Map();
   }
 
   /**
@@ -31,41 +31,43 @@ class EventHandlerExecutionMetadata {
    *
    * @function EventHandlerExecutionMetadata#_provideHandlerReturnValuesObject
    * @param {string} pluginName Name of the plugin.
-   * @param {boolean} pushToHandlers Whether to push the plugin name to the list
-   *  of handler plugins.
+   * @param {boolean} [pushToHandlers] Whether to push the plugin name to the
+   *  list of handler plugins.
    * @private
    */
-  _provideHandlerReturnValuesObject(pluginName, pushToHandlers) {
-    if (this.handlerReturnValues[pluginName] === undefined) {
-      this.handlerReturnValues[pluginName] = [];
+  _provideHandlerReturnValuesObject(pluginName, pushToHandlers = false) {
+    if (!this.handlerReturnValues.has(pluginName)) {
+      this.handlerReturnValues.set(pluginName, []);
       if (pushToHandlers === true) this.handlerPlugins.push(pluginName);
     }
   }
 
   /**
-   * Creates a metadata proxy for the given plugin name.
+   * Creates a metadata proxy for the given plugin name and event handler.
    *
    * @function EventHandlerExecutionMetadata#forPlugin
    * @param {string} pluginName Name of the plugin.
-   * @returns {EventHandlerExecutionMetadata~Proxy} The proxy.
+   * @param {object.<*>} eventHandler Event handler object.
+   * @returns {EventHandlerExecutionMetadata.Proxy} The proxy.
    *
-   * @see EventHandlerExecutionMetadata~Proxy
+   * @see EventHandlerExecutionMetadata.Proxy
    */
-  forPlugin(pluginName) {
-    return new EventHandlerExecutionMetadata.Proxy(this, pluginName);
+  forPlugin(pluginName, eventHandler) {
+    return new EventHandlerExecutionMetadata.Proxy(this, pluginName,
+        eventHandler);
   }
 
   /**
    * Returns the custom metadata stored for the given property and plugin.
    *
    * @function EventHandlerExecutionMetadata#get
-   * @param {string} pluginName Name of the plugin.
    * @param {string} property Name of the property.
+   * @param {string} pluginName Name of the plugin.
    * @returns {(undefined|*)} The stored value or undefined if no value is
    *  stored for the property and plugin nanem.
    */
-  get(pluginName, property) {
-    return (this.data[pluginName] || {})[property];
+  get(property, pluginName) {
+    return (this.data.get(pluginName) || {})[property];
   }
 
   /**
@@ -84,7 +86,7 @@ class EventHandlerExecutionMetadata {
       return this.returnValue;
     } else {
       this._provideHandlerReturnValuesObject(pluginName);
-      return this.handlerReturnValues[pluginName].slice(-1)[0];
+      return this.handlerReturnValues.get(pluginName).slice(-1)[0];
     }
   }
 
@@ -101,7 +103,7 @@ class EventHandlerExecutionMetadata {
   registerReturnValue(pluginName, returnValue) {
     this._provideHandlerReturnValuesObject(pluginName, true);
 
-    this.handlerReturnValues[pluginName].push(returnValue);
+    this.handlerReturnValues.get(pluginName).push(returnValue);
     this.returnValue = returnValue !== false && this.returnValue;
 
     return this;
@@ -118,13 +120,13 @@ class EventHandlerExecutionMetadata {
    *
    */
   set(pluginName, property, value) {
-    this.data[pluginName] = this.data[pluginName] || {};
+    this.data.set(pluginName, this.data.get(pluginName) || {});
 
-    this.data[pluginName][property] = value;
+    this.data.get(pluginName)[property] = value;
 
     return this;
   }
-};
+}
 
 /**
  * Metadata proxy for plugins which makes setting and getting properties more
@@ -132,14 +134,16 @@ class EventHandlerExecutionMetadata {
  *
  * @property {EventHandlerExecutionMetadata} metadata Proxied metadata object.
  * @property {string} pluginName Name of the plugin this proxy was created for.
+ * @property {object.<*>} eventHandler Associated event handler object.
  *
- * @class EventHandlerExecutionMetadata~Proxy
+ * @class EventHandlerExecutionMetadata.Proxy
  * @see EventHandlerExecutionMetadata#forPlugin
  */
 class Proxy {
-  constructor(metadata, pluginName) {
+  constructor(metadata, pluginName, eventHandler) {
     this.metadata = metadata;
     this.pluginName = pluginName;
+    this.eventHandler = eventHandler;
   }
 
   /**
@@ -170,8 +174,8 @@ class Proxy {
    *
    * @see EventHandlerExecutionMetadata#get
    */
-  get(property, pluginName) {
-    return this.metadata.get(pluginName || this.pluginName, property);
+  get(property, pluginName = this.pluginName) {
+    return this.metadata.get(pluginName, property);
   }
 
   /**

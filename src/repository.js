@@ -191,7 +191,6 @@ const local = {
    */
   getRepositoryConfigurationDefaults: () => {
     return {
-      name: new Date().toString(),
       plugins: null
     };
   },

@@ -23,6 +23,9 @@ room.pluginSpec = {
   config: {
     param1: `value`,
   },
+  configDescriptions: {
+    param1: `Description`,
+  },
   dependencies: [`aut/otherPlugin1`],
   order: {
     'onPlayerChat': {
@@ -43,6 +46,8 @@ room.pluginSpec = {
   Changes to these values at runtime can and should be handled by the plugin
   or otherwise the behavior should be documented.
   See [event handlers](#event_handlers).
+- `configDescriptions`: Descriptions of configuration options, for documentation
+  purposes (optional).
 - `dependencies`: A list of plugin names that your plugin depends on. Note
   that it is possible to check for the availability of plugins at runtime
   (and even try to load additional plugins), so please do not include optional
@@ -313,10 +318,12 @@ Several components for the HHM system are exposed globally:
 
 There are several ways to publish your plugin:
 
-- You can add it to this repository by cloning it, adding your plugin under
-  `plugins/author/pluginName` and creating a
-  [pull request](https://help.github.com/articles/creating-a-pull-request/).
-- You can upload it into your own repository (which can be a proper directory
+- You can create your own GitHub repository with a similar structure as
+  [saviola777/hhm-plugins](https://github.com/saviola777/hhm-plugins)
+- You can add it to this repository by cloning / forking it, adding your plugin
+  under `src/author/pluginName` (and optionally creating a
+  [pull request](https://help.github.com/articles/creating-a-pull-request/)).
+- You can upload it onto your own server (which can be a proper directory
   structure to load plugins from, or e.g. a PHP script serving the plugins).
 - You can just offer the file or code for download and the user can then
   copy & paste the plugin into the
@@ -346,7 +353,7 @@ would look like this:
 HHM.config.repositories = [
     // […]
     {
-      type: `plain`, // optional, this is the default value
+      type: `plain`,
       url: `https://yourdomain.tld/plugins/`,
       suffix: `.js`, // optional, this is the default value
     }
@@ -354,7 +361,7 @@ HHM.config.repositories = [
 ```
 
 Make sure you have your server set up to send
-[CORS headers](https://enable-cors.org/) or else your plugins can't be loaded
+[CORS headers](https://enable-cors.org/) or else your plugins can't be loaded.
 
 ### Using a GitHub repository
 
@@ -381,6 +388,35 @@ HHM.config.repositories = [
     }
 ];
 ```
+
+### Providing repository information
+
+Repository information are optional metadata describing a repository and its
+contents. For URL-based repository types like GitHub repositories, the
+repository information are loaded from the file `repository.json` at the root
+of the repository:
+
+```json
+{
+    "name": "Optional name for the repository",
+    "description": "Optional description for the repository.",
+    "author": "Optional author of the repository.",
+    "config": {
+        "path": "Optional path to where the plugins are in the repository",
+        "otherParam": "Optional other repository configuration parameters"
+    },
+    "plugins": [
+        "bla/bla",
+        "bla/daa"
+    ]
+}
+```
+
+For other repository types, refer to the implementation of the [repository type
+handler](https://github.com/saviola777/haxball-headless-manager/blob/master/src/repositories.js)
+to find out how repository information can be provided. The `local`
+repository type, for example, accepts the repository information as part of the
+repository configuration.
 
 # Useful plugins
 
@@ -454,7 +490,7 @@ Here are some examples for handler names:
 - `room.onCommand_help`: Called for `!help` but also for `!help topic` but not
   for `!helpme`.
 - `room.onCommand0_help`: Only called for exactly `!help` without any arguments.
-- `room.onCommand0_help_topic`: Called for `!help topic` only. Not that this
+- `room.onCommand0_help_topic`: Called for `!help topic` only. Note that this
   has higher precedence compared to `room.onCommand1_help` for example. So if
   you have both `room.onCommand1_help` and `room.onCommand0_help_topic`, then
   only the latter is called when someone writes `!help topic`.
@@ -487,7 +523,7 @@ be able to disable and enable plugins at runtime. And guess what `setTimeout()`
 This plugins essentially wraps calls to `setTimeout()` and `setInterval()` in a
 way that makes it possible to disable / pause these tasks.
 
-This doesn't mean you can use `setTimeout()` and `setInterval()` in your scripts
+This doesn't mean you can't use `setTimeout()` and `setInterval()` in your scripts
 or plugins, but then your plugin can't be disabled properly and might break when
 the system tries to disable it.
 

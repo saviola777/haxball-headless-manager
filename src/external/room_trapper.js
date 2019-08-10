@@ -37,9 +37,12 @@
  */
 
 /**
- * Creates a a trapped room managed by a trapped room manager.
+ * Creates a a proxied, or trapped, room object using the given original room
+ * and identifier.
  *
  * @function external:haxball-room-trapper.RoomTrapper#createTrappedRoom
+ * @param {external:native-api:RoomObject} roomObject Original room object.
+ * @param {*} identifier Identifier of this trapped room.
  * @returns {external:haxball-room-trapper.TrappedRoom} The trapped room.
  * @see external:haxball-room-trapper.TrappedRoomManager
  */
