@@ -229,10 +229,10 @@ module.exports.createRoom = function(room, pluginManager) {
      * @returns {(external:haxball-room-trapper.TrappedRoom|undefined)} Plugin
      *  room proxy or undefined if the plugin was not found and `create` is
      *  `false`.
-     * @see PluginManager#getPluginByName
+     * @see PluginManager#getPlugin
      */
     getPlugin: function(pluginName, create) {
-      return pluginManager.getPluginByName(pluginName, create);
+      return pluginManager.getPlugin(pluginName, create);
     },
 
     /**
@@ -331,12 +331,12 @@ module.exports.createRoom = function(room, pluginManager) {
     /**
      * Returns whether a valid plugin with the given name exists.
      *
-     * @see PluginManager#hasPluginById
+     * @see PluginManager#hasPlugin
      * @memberOf HhmRoomObject
      * @returns {boolean} Whether a valid plugin with the given name exists.
      */
     hasPlugin: function(pluginName) {
-      return pluginManager.hasPluginByName(pluginName);
+      return pluginManager.hasPlugin(pluginName);
     },
 
     /**

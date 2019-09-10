@@ -61,7 +61,7 @@ class PluginLoader {
         ? pluginCode.toString() : pluginCode;
     pluginRoom._sourceHash = hashFunction(pluginRoom._source, hashSeed);
 
-    if (!this.room._pluginManager.hasPluginById(pluginRoom._id)) {
+    if (!this.room._pluginManager.hasPlugin(pluginRoom._id)) {
       HHM.log.error(
           `Invalid plugin ${pluginRoom.getName()}, either an error happened ` +
           `during plugin execution or HBInit() was not called`);
@@ -187,7 +187,7 @@ class PluginLoader {
     }
 
     if (pluginId !== -1 ) {
-      const pluginRoom = this.room._pluginManager.getPluginById(pluginId);
+      const pluginRoom = this.room._pluginManager.getPlugin(pluginId);
 
       HHM.log.info(`Plugin ${pluginRoom.getName()} loaded from `
           + pluginRoom._loadedFrom.getName());
@@ -242,7 +242,6 @@ class PluginLoader {
       }
     }
 
-
     for (let repository of [...repositoryCandidates, ...otherRepositories]) {
 
       let repositoryResult = await repository.getPluginSource(pluginName);
@@ -258,6 +257,9 @@ class PluginLoader {
           await this._tryToLoadPluginByCode(repositoryResult, pluginName);
 
       if (pluginId !== -1) {
+        this.room.getPluginManager()
+            .getPlugin(pluginId)._loadedFrom = repository;
+
         return pluginId;
       }
     }

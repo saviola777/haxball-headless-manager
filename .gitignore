@@ -1,6 +1,5 @@
 # node
 /node_modules/
-package-lock.json
 
 # version information
 /src/_version.js

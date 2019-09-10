@@ -127,7 +127,8 @@ If you just want to load your own plugin or native headless script into a
 running HHM system, paste your script into the following command:
 
 ```javascript
-HHM.manager.addPluginByCode(`<paste your code here>`, `_user/my-plugin`)
+HHM.manager.addPlugin({ pluginCode: `<paste your code here>`,
+  pluginName: `_user/my-plugin` })
 ```
 
 You can repeat this for any number of scripts / plugins, just make sure to

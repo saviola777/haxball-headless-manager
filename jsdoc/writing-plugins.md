@@ -112,9 +112,9 @@ call
 
 ```javascript
 // First disable dependent plugins
-HHM.manager.getDependentPluginsById(pluginId)
-    .forEach((id) => HHM.manager.disablePluginById(id));
-HHM.manager.disablePluginById(pluginId);
+HHM.manager.getDependentPlugins(pluginId)
+    .forEach((id) => HHM.manager.disablePlugin(id));
+HHM.manager.disablePlugin(pluginId);
 ```
 
 A plugin can only be disabled if no other enabled plugins depend on it.

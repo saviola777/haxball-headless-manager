@@ -33,7 +33,7 @@ const github = {
    * @async
    * @param {repository.Repository} repository Repository object.
    * @param {string} pluginName Plugin name.
-   * @throws repository.RepositoryTypeError If a non-github repository is given.
+   * @throws {repository.RepositoryTypeError} If a non-github repository is given.
    * @returns {Promise.<(string|boolean)>} Plugin URL or false if plugin not
    *  available in the repository or some other error happened while trying to
    *  load the plugin.
@@ -99,7 +99,7 @@ const github = {
    * custom repository name is specified, the GitHub repository name is used.
    *
    * @function repository.github.getRepositoryInformation
-   * @throws repository.RepositoryTypeError If a non-github repository is given.
+   * @throws {repository.RepositoryTypeError} If a non-github repository is given.
    * @returns {repository.RepositoryInformation} GitHub repository information.
    */
   getRepositoryInformation: async (repository) =>  {
@@ -200,7 +200,7 @@ const local = {
    *
    * @function module:src/repository.local.getRepositoryInformation
    * @async
-   * @throws repository.RepositoryTypeError If a non-local repository is given.
+   * @throws {repository.RepositoryTypeError} If a non-local repository is given.
    * @returns {Promise.<repository.RepositoryInformation>} Repository information.
    */
   getRepositoryInformation: async (repository) =>  {
@@ -242,7 +242,7 @@ const plain = {
    * @async
    * @param {repository.Repository} repository Repository object.
    * @param {string} pluginName Plugin name.
-   * @throws repository.RepositoryTypeError If a non-plain repository is given.
+   * @throws {repository.RepositoryTypeError} If a non-plain repository is given.
    * @returns {Promise.<(string|boolean)>} Plugin URL or false if no plugin
    *  name was specified.
    */
@@ -267,7 +267,7 @@ const plain = {
    * Loads the given plugin from the given plain repository.
    *
    * @function module:src/repository.plain.getRepositoryConfigurationDefaults
-   * @throws repository.RepositoryTypeError If a non-plain repository is given.
+   * @throws {repository.RepositoryTypeError} If a non-plain repository is given.
    * @returns {object.<*>} Repository configuration object.
    */
   getRepositoryConfigurationDefaults: () => {
@@ -283,7 +283,7 @@ const plain = {
    * @function module:src/repository.plain.getPluginSource
    * @async
    * @param {repository.Repository} repository Repository object.
-   * @throws repository.RepositoryTypeError If a non-plain repository is given.
+   * @throws {repository.RepositoryTypeError} If a non-plain repository is given.
    * @returns {Promise.<repository.RepositoryInformation>} Repository
    *  information object.
    */

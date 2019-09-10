@@ -85,7 +85,7 @@ class TrappedRoomManager {
    */
   _addVertices(vertices, pluginId, handlerName, orderProperty) {
     const pluginFirst = orderProperty === `before`;
-    const pluginRoom = this.room._pluginManager.getPluginById(pluginId);
+    const pluginRoom = this.room._pluginManager.getPlugin(pluginId);
     const order = pluginRoom.getPluginSpec().order;
     let pluginNames;
 
@@ -127,9 +127,11 @@ class TrappedRoomManager {
    * @function TrappedRoomManager#_createHandlerObject
    * @private
    * @param {(Function|object)} handler Event handler function or object.
+   * @param {object.<*>} [additionalObjectDefaults] Additional properties to
+   *  be merged into the handler object.
    * @returns {object} Event handler object.
    */
-  _createHandlerObject(handler) {
+  _createHandlerObject(handler, additionalObjectDefaults = {}) {
 
     let handlerObject = handler;
 
@@ -143,41 +145,27 @@ class TrappedRoomManager {
       },
     };
 
-    return merge({}, handlerObjectDefaults, handlerObject);
+    return merge({}, handlerObjectDefaults, additionalObjectDefaults,
+        handlerObject);
   }
 
   /**
    * Executes the given handler.
    *
    * @function TrappedRoomManager#_executeHandler
-   * @private
-   * @param {(Function|Object|Array)} handlerFunctions The handler function, or
-   *  collection of functions in an iterable object.
    * @param {object.<*>} handlerObject Handler object.
    * @param {string} pluginName Name of the plugin.
    * @param {EventHandlerExecutionMetadata} metadata Event metadata.
    * @param {...*} args Event arguments.
    */
-  _executeHandler(handlerFunctions, handlerObject, pluginName, metadata, ...args) {
+  executeHandler(handlerObject, pluginName, metadata, ...args) {
+
+    const handlerFunctions = handlerObject.functions;
+
     // TODO do we expect a non object handler?
     if (typeof handlerFunctions === `function`) {
-      let extraArgsPosition = this.functionReflector
-          .getArgumentInjectionPosition(handlerFunctions, args);
-
-      if (extraArgsPosition >= 0) {
-        args = args.concat(Array(Math.max(0, extraArgsPosition - args.length))
-            .fill(undefined))
-            .concat(metadata.forPlugin(pluginName, handlerObject));
-      }
-
-      try {
-        // TODO execute function on the handler object
-        metadata.registerReturnValue(pluginName, handlerFunctions(...args));
-      } catch (e) {
-        HHM.log.error(`Error during execution of handler ` +
-            `${metadata.handlerName} for plugin ${pluginName}`);
-        HHM.log.error(e);
-      }
+      this._executeHandlerFunction(handlerFunctions, handlerObject, pluginName,
+          metadata, ...args);
     }
      else if (typeof handlerFunctions !== `object`) {
       // TODO support string handlers?
@@ -187,16 +175,48 @@ class TrappedRoomManager {
     // Iterable
     else if (typeof handlerFunctions[Symbol.iterator] === `function`) {
       for (let h of handlerFunctions) {
-        this._executeHandler(h, handlerObject, pluginName, metadata, ...args);
+        this._executeHandlerFunction(h, handlerObject, pluginName, metadata,
+            ...args);
       }
     }
 
     else {
       // Object iteration
       for (let h of Object.getOwnPropertyNames(handler)) {
-        this._executeHandler(handlerFunctions[h], handlerObject, pluginName,
-            metadata, ...args);
+        this._executeHandlerFunction(handlerFunctions[h], handlerObject,
+            pluginName, metadata, ...args);
       }
+    }
+  }
+
+  /**
+   * TODO documentation
+   *
+   * @param {Function} handlerFunction The handler function.
+   * @param {object.<*>} handlerObject Handler object.
+   * @param {string} pluginName Name of the plugin.
+   * @param {EventHandlerExecutionMetadata} metadata Event metadata.
+   * @param {...*} args Event arguments.
+   */
+  _executeHandlerFunction(handlerFunction, handlerObject, pluginName, metadata,
+                                  ...args) {
+
+    let extraArgsPosition = this.functionReflector
+        .getArgumentInjectionPosition(handlerFunction, args);
+
+    if (extraArgsPosition >= 0) {
+      args = args.concat(Array(Math.max(0, extraArgsPosition - args.length))
+          .fill(undefined))
+          .concat(metadata.forPlugin(pluginName, handlerObject));
+    }
+
+    try {
+      // TODO execute function on the handler object
+      metadata.registerReturnValue(pluginName, handlerFunction(...args));
+    } catch (e) {
+      HHM.log.error(`Error during execution of handler ` +
+          `${metadata.handlerName} for plugin ${pluginName}`);
+      HHM.log.error(e);
     }
   }
 
@@ -211,8 +231,8 @@ class TrappedRoomManager {
    * TODO remove
    */
   _isPluginEnabledAndLoaded(pluginId) {
-    return this.room.getPluginManager().hasPluginById(pluginId)
-      && this.room.getPluginManager().getPluginById(pluginId).isEnabled();
+    return this.room.getPluginManager().hasPlugin(pluginId)
+      && this.room.getPluginManager().getPlugin(pluginId).isEnabled();
   }
 
   /**
@@ -262,7 +282,7 @@ class TrappedRoomManager {
   _provideHandler(pluginId, handlerName) {
     // Make sure the handler is registered
     if (this.room[handlerName] === undefined) {
-      this.room._pluginManager.getPluginById(pluginId)[handlerName] = () => {};
+      this.room._pluginManager.getPlugin(pluginId)[handlerName] = () => {};
     }
   }
 
@@ -315,7 +335,7 @@ class TrappedRoomManager {
 
     // Establish execution order dependencies for each plugin
     for (let pluginId of pluginIds) {
-      let pluginSpec = this.room.getPluginManager().getPluginById(pluginId)
+      let pluginSpec = this.room.getPluginManager().getPlugin(pluginId)
           .getPluginSpec();
 
       if (!pluginSpec.hasOwnProperty(`order`)) {
@@ -341,7 +361,7 @@ class TrappedRoomManager {
     }
     catch (e) {
       let pluginId = e.message.split('"')[1];
-      let pluginName = this.room._pluginManager.getPluginById(pluginId)._name;
+      let pluginName = this.room._pluginManager.getPlugin(pluginId)._name;
 
       HHM.log.error(`There was a cyclic dependency for handler ${handlerName} and plugin ${pluginName}`);
       // TODO
@@ -543,7 +563,7 @@ class TrappedRoomManager {
     this.room._pluginManager.triggerHhmEvent(HHM.events.EVENT_HANDLER_SET, {
       handler: this.handlers[pluginId][handlerName],
       handlerName,
-      plugin: this.room._pluginManager.getPluginById(pluginId),
+      plugin: this.room._pluginManager.getPlugin(pluginId),
     });
   }
 
@@ -560,7 +580,7 @@ class TrappedRoomManager {
 
     // TODO retain handler object, but set to deleted?
     const handler = this.handlers[pluginId][handlerName];
-    const plugin = this.room._pluginManager.getPluginById(pluginId);
+    const plugin = this.room._pluginManager.getPlugin(pluginId);
 
     delete this.handlers[pluginId][handlerName];
 
@@ -715,6 +735,7 @@ class TrappedRoomManager {
           try {
             let returnValue = hook({
               room: this.room,
+              // TODO pass object handler
               metadata: metadata.forPlugin(pluginName)
             }, ...args);
 
@@ -742,8 +763,7 @@ class TrappedRoomManager {
           break;
         }
 
-        this._executeHandler(this.handlers[pluginId][handlerName].functions,
-            this.handlers[pluginId][handlerName],
+        this.executeHandler(this.handlers[pluginId][handlerName],
             this.room._pluginManager.getPluginName(pluginId), metadata,
                 ...args);
       }
@@ -762,6 +782,7 @@ class TrappedRoomManager {
 
         for (let hook of this.postEventHandlerHooks[handlerName][pluginId]) {
           try {
+            // TODO pass handler object
             hook({ room: this.room, metadata: metadata.forPlugin(pluginName) }, ...args);
           } catch (e) {
             HHM.log.error(`Error during execution of post-event handler hook ` +
@@ -817,7 +838,7 @@ class TrappedRoomManager {
     this.properties[pluginId][propertyName] = value;
 
     this.room._pluginManager.triggerHhmEvent(HHM.events.PROPERTY_SET, {
-      plugin: this.room._pluginManager.getPluginById(pluginId),
+      plugin: this.room._pluginManager.getPlugin(pluginId),
       propertyName: propertyName,
       propertyValue: value,
       propertyValueOld: valueOld,
@@ -840,7 +861,7 @@ class TrappedRoomManager {
     delete this.properties[pluginId][propertyName];
 
     this.room._pluginManager.triggerHhmEvent(HHM.events.PROPERTY_UNSET, {
-      plugin: this.room._pluginManager.getPluginById(pluginId),
+      plugin: this.room._pluginManager.getPlugin(pluginId),
       propertyName: propertyName,
       propertyValue: propertyValue,
     });
@@ -856,7 +877,7 @@ class TrappedRoomManager {
    * @param {number} pluginId Plugin ID.
    */
   removePluginHandlersAndProperties(pluginId) {
-    if (!this.room._pluginManager.hasPluginById(pluginId)) {
+    if (!this.room._pluginManager.hasPlugin(pluginId)) {
       return;
     }
 
@@ -918,6 +939,7 @@ class TrappedRoomManager {
    *  chaining.
    */
   addPreEventHandlerHook(pluginId, handlerNames, hook) {
+    // TODO turn hook into handler object
     if (typeof handlerNames === `object` &&
         typeof handlerNames[Symbol.iterator] === 'function') {
       for (let handlerName of handlerNames) {
@@ -961,6 +983,7 @@ class TrappedRoomManager {
    *  chaining.
    */
   addPostEventHandlerHook(pluginId, handlerNames, hook) {
+    // TODO turn hook into handler object
     if (typeof handlerNames === `object` &&
         typeof handlerNames[Symbol.iterator] === 'function') {
       for (let handlerName of handlerNames) {

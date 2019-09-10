@@ -1,10 +1,3 @@
-# To deploy you need the following symlinks/mounts:
-# - remote/: remote server for 'make deploy'
-# - remote_stable/: remote server for 'make deploy_stable'
-# - plugins/: plugin directory, should contain one folder per repository
-#
-# browserify needs to be installed or symlinked, e.g.:
-# npm install browserify && ln -s `pwd`/node_modules/browserify/bin/cmd.js ~/bin/browserify
 all: build
 build: prepare_build
 	@echo "Generating version information"
@@ -19,7 +12,8 @@ release: build
 prepare_build:
 	@echo "Preparing dist directory..."
 	mkdir -p dist/{releases,.local}
-	rm -rf dist/.local/*
+	mkdir -p dist/.local/hhm
+	rm -rf dist/.local/hhm/*
 jsdoc:
 	@echo "Compiling JSDoc"
 	mkdir -p dist/api
