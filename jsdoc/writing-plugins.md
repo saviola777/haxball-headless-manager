@@ -728,7 +728,7 @@ A ton of configuration options allow fine-grained control over the features
 of this plugin. Here's an example of how to use the message prefixes in your plugin:
 
 ```javascript
-room.sendChat(`Global message`, undefined, `REFEREE`);
+room.sendAnnouncement(`Global message`, undefined, { prefix: `REFEREE` });
 ```
 
 For more information see the [plugin source](https://github.com/saviola777/hhm-plugins/blob/master/src/sav/chat.js).

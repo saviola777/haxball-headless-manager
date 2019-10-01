@@ -3,7 +3,7 @@ build: prepare_build
 	@echo "Generating version information"
 	./scripts/version.sh
 	@echo "Running browserify..."
-	./node_modules/browserify/bin/cmd.js index.js -o dist/.local/hhm-testing.js -d
+	./node_modules/browserify/bin/cmd.js index.js -o dist/.local/hhm/hhm-testing.js -d
 release: build
 	@echo "Releasing HHM files..."
 	./scripts/release.sh

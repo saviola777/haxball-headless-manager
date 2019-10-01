@@ -4,9 +4,9 @@ VERSION="`npm list | grep haxball-headless-manager | cut -d' ' -f1 | cut -d'@' -
 if [[ "`echo $VERSION | cut -d'-' -f2`" == "git" ]]
 then
   echo "Releasing git version"
-  cp dist/.local/hhm-testing.js dist/releases/hhm-git.js
+  cp dist/.local/hhm/hhm-testing.js dist/releases/hhm-git.js
 else
   echo "Releasing stable $VERSION"
-  cp dist/.local/hhm-testing.js dist/releases/hhm-$VERSION.js
-  cp dist/.local/hhm-testing.js dist/releases/hhm-latest.js
+  cp dist/.local/hhm/hhm-testing.js dist/releases/hhm-$VERSION.js
+  cp dist/.local/hhm/hhm-testing.js dist/releases/hhm-latest.js
 fi

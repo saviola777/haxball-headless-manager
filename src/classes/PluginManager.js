@@ -1,4 +1,5 @@
 const $ = require(`jquery-browserify`);
+const EventHandlerExecutionMetadata = require(`./EventHandlerExecutionMetadata`);
 const PluginLoader = require(`./PluginLoader`);
 const TrappedRoomManager = require(`./TrappedRoomManager`);
 const { RoomTrapper } = require(`haxball-room-trapper`);
@@ -86,7 +87,7 @@ class PluginManager {
 
     if (pluginName !== undefined && this.room.hasPlugin(pluginName)) {
       // Avoid loading plugins twice
-        return loadStack || this.room.getPluginId(plugName);
+        return loadStack || this.getPluginId(pluginName);
     }
 
     const pluginId = await this.pluginLoader.tryToLoadPlugin(
@@ -401,7 +402,7 @@ class PluginManager {
 
       this.triggerLocalEvent(plugin, `onRoomLink`, HHM.roomLink);
 
-      this.triggerHhmEvent( HHM.events.BEFORE_PLUGIN_LOADED, {
+      this.triggerHhmEvent(HHM.events.BEFORE_PLUGIN_LOADED, {
         plugin: plugin,
       });
 
@@ -604,6 +605,7 @@ class PluginManager {
    * @param {Array.<*>} args Event handler arguments.
    */
   static _triggerEventOnRoom(room, eventHandlerName, ...args) {
+
     if (room.hasOwnProperty(eventHandlerName)) {
       return room[eventHandlerName](...args);
     }
@@ -835,8 +837,9 @@ class PluginManager {
 
     let handlerNames = [];
 
-    for (let pluginId of
-        Object.getOwnPropertyNames(this.room._trappedRoomManager.handlers)) {
+    for (let pluginId of Object.getOwnPropertyNames(
+        this.room._trappedRoomManager.handlers)) {
+
       handlerNames = handlerNames.concat(Object.getOwnPropertyNames(
           this.room._trappedRoomManager.handlers[pluginId]));
     }
@@ -1226,9 +1229,16 @@ class PluginManager {
    * @param {...*} [args] Event arguments.
    */
   triggerLocalEvent(plugin, eventHandlerName, ...args) {
-    PluginManager._triggerEventOnRoom(plugin, eventHandlerName, ...args);
+    const eventHandlerObject = plugin.getEventHandlerObject(eventHandlerName);
+    let metadata = new EventHandlerExecutionMetadata(eventHandlerName);
+
+    if (eventHandlerObject !== undefined) {
+      metadata = eventHandlerObject.execute(...args);
+    }
+
     this.triggerHhmEvent(HHM.events.LOCAL_EVENT, { plugin,
-      localEventName: eventHandlerName, localEventArgs: args
+      localEventName: eventHandlerName, localEventArgs: args,
+      metadata,
     });
   }
 

@@ -150,8 +150,7 @@ if (this.handlerExecutionOrders.hasOwnProperty(handlerName)) {
       break;
     }
 
-    this.executeHandler(this.handlers[pluginId][handlerName],
-        this.room._pluginManager.getPluginName(pluginId), metadata,
+    this.executeHandler(this.handlers[pluginId][handlerName], metadata,
             ...args);
   }
 }
