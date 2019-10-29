@@ -571,13 +571,24 @@ class PluginManager {
   /**
    * Removes the room proxy for the given plugin.
    *
+   * Before a plugin can be removed, it has to be disabled and removal will
+   * fail if (other) plugins depend on it.
+   *
    * @function PluginManager#removePlugin
    * @param {number} pluginId ID of the plugin to be removed.
-   * @returns {boolean} Whether the removal was successful.
+   * @returns {boolean} Whether the removal was successful. Removal fails if
+   *  the plugin cannot be disabled (i.e. if it depends on itself or other
+   *  plugins depend on it). Removal is considered successful if the plugin
+   *  with the given ID does not exist.
    */
   removePlugin(pluginId) {
 
-    if (!this.hasPlugin(pluginId)) return false;
+    if (!this.hasPlugin(pluginId)) return true;
+
+    if (!this.canPluginBeDisabled(pluginId)
+        || this.disablePlugin(pluginId, false).indexOf(pluginId) === -1) {
+      return false;
+    }
 
     const pluginRoom = this.plugins.get(pluginId);
 
@@ -687,7 +698,7 @@ class PluginManager {
     const disabledPlugins = [];
 
     // Already disabled or can't be disabled
-    if (this.pluginsDisabled.indexOf(pluginId) !== -1
+    if (!this.isPluginEnabled(pluginId)
         || pluginIdStack.indexOf(pluginId) !== -1
         || !this.canPluginBeDisabled(pluginId)) {
       return disabledPlugins;
@@ -775,7 +786,7 @@ class PluginManager {
 
     let dependencies = includeDisabled ? this.dependencies.get(pluginName) :
         this.dependencies.get(pluginName).filter(
-            (pluginId) => this.getPlugin(pluginId).isEnabled());
+            (pluginId) => this.isPluginEnabled(pluginId));
 
     if (!recursive) {
       return dependencies;
@@ -828,23 +839,11 @@ class PluginManager {
    * Returns an `Array` of all registered handler names.
    *
    * @function PluginManager#getHandlerNames
+   * @see TrappedRoomManager#getAllEventHandlerNames
    * @returns {Array.<string>} Registered handler names.
    */
   getHandlerNames() {
-    if (this.room._trappedRoomManager === undefined) {
-      return [];
-    }
-
-    let handlerNames = [];
-
-    for (let pluginId of Object.getOwnPropertyNames(
-        this.room._trappedRoomManager.handlers)) {
-
-      handlerNames = handlerNames.concat(Object.getOwnPropertyNames(
-          this.room._trappedRoomManager.handlers[pluginId]));
-    }
-
-    return [...new Set(handlerNames)];
+    return this.room._trappedRoomManager.getAllEventHandlerNames();
   }
 
   /**
@@ -1090,7 +1089,8 @@ class PluginManager {
   }
 
   /**
-   * Returns true if the plugin can be disabled, false otherwise.
+   * Returns true if the plugin can be disabled (or is already disabled),
+   * false otherwise.
    *
    * A plugin can be disabled if it does not depend on itself and if all of the
    * plugins that depend on it can be disabled.
@@ -1101,6 +1101,10 @@ class PluginManager {
    */
   canPluginBeDisabled(pluginIdOrName) {
     const { pluginId } = this._extractPluginNameAndId(pluginIdOrName);
+
+    if (!this.isPluginEnabled(pluginId)) {
+      return true;
+    }
 
     const dependentPlugins = this.getDependentPlugins(pluginId, false);
 

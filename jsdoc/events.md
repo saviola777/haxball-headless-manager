@@ -25,30 +25,6 @@ and consists of the following steps:
 
 ### Pre-event handler hooks
 
-```javascript
-// Execute pre-event handler hooks
-if (this.preEventHandlerHooks[handlerName] !== undefined) {
-
-  for (let pluginId of
-      Object.getOwnPropertyNames(this.preEventHandlerHooks[handlerName])) {
-
-    if (!this._isPluginEnabledAndLoaded(pluginId)) {
-      continue;
-    }
-
-    const pluginName = this.room._pluginManager.getPluginName(pluginId);
-
-    for (let hook of this.preEventHandlerHooks[handlerName][pluginId]) {
-      let returnValue = hook({room: this.room,
-            metadata: metadata.forPlugin(pluginName)}, ...args);
-
-      args = Array.isArray(returnValue) ? returnValue : args;
-      metadata.registerReturnValue(pluginName, returnValue);
-    }
-  }
-}
-```
-
 First, all registered pre-event handler hooks for all enabled plugins are executed.
 These hooks can return an `Array` which replaces the event arguments or any
 other value which can be taken into account in the associated event state
@@ -138,8 +114,8 @@ Event handler execution loop:
 
 ```javascript
 // Execute event handlers
-if (this.handlerExecutionOrders.hasOwnProperty(handlerName)) {
-  for (let pluginId of this.handlerExecutionOrders[handlerName]) {
+if (this.handlerExecutionOrders.has(handlerName)) {
+  for (let pluginId of this.handlerExecutionOrders.get(handlerName)) {
     // Skip disabled plugins
     if (!this._isPluginEnabledAndLoaded(pluginId)) {
       continue;
@@ -182,25 +158,8 @@ plugin-specific metadata storage.
 
 ### Post-event handler hooks
 
-```javascript
-// Execute post-event handler hooks
-if (this.postEventHandlerHooks[handlerName] !== undefined) {
-  for (let pluginId of Object.getOwnPropertyNames(
-      this.postEventHandlerHooks[handlerName])) {
-
-    if (!this._isPluginEnabledAndLoaded(pluginId)) {
-      continue;
-    }
-
-    for (let hook of this.postEventHandlerHooks[handlerName][pluginId]) {
-      hook({ room: this.room, metadata: metadata }, ...args);
-    }
-  }
-}
-```
-
 Much like the pre-event handler hooks, the post-event handler hooks can be
-registered with {@link HhmRoomObject#addPostEventHandlerHook} and will be
+registered with {@link HhmRoomObject#addPostEventHook} and will be
 executed after the event handlers with the same arguments `room` and `metadata`.
 
 They have a less important role than pre-event handler hooks in that they are

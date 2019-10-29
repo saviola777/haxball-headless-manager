@@ -1,5 +1,4 @@
 const hashFunction = require(`../hash`);
-const deepEqual = require(`deep-equal`);
 const hashSeed = 14868;
 
 /**

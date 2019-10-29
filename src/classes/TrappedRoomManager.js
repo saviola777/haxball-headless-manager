@@ -1,5 +1,7 @@
 const merge = require('lodash.merge');
 const toposort = require(`toposort`);
+const hashFunction = require(`../hash`);
+const hashSeed = 14868;
 const EventHandlerExecutionMetadata = require(`./EventHandlerExecutionMetadata`);
 
 /**
@@ -14,19 +16,17 @@ const EventHandlerExecutionMetadata = require(`./EventHandlerExecutionMetadata`)
  *  handler.
  * @property {FunctionReflector} functionReflector `FunctionReflector` used to
  *  analyze event handler functions.
- * @property {Object.<string, Array.<number>>} handlerExecutionOrders `Array` of
+ * @property {Map.<string, Array.<number>>} handlerExecutionOrders `Array` of
  *  plugin IDs in execution order for each handler.
  * @property {Set.<string>} handlerNames Known event handler names.
  * @property {Object.<number, Object.<string, Function>>} handlers Event
  *  handlers for each plugin.
  * @property {boolean} handlersDirty Whether handlers have been changed since
  *  the last call to {@link TrappedRoomManager#determineExecutionOrders}.
- * @property {Object.<string, Object.<number, Array.<Function>>>}
- *  postEventHandlerHooks `Array` of post-event handler hooks for each plugin
- *  and handler.
- * @property {Object.<string, Object.<number, Array.<Function>>>}
- *  preEventHandlerHooks `Array` of pre-event handler hooks for each plugin and
- *  handler.
+ * @property {Map.<string, Map.<number, Map.<string, Function>>>}
+ *  postEventHooks `Map` of post-event hooks for each plugin and handler.
+ * @property {Map.<string, Map.<number, Map.<string, Function>>>}
+ *  preEventHooks `Map` of pre-event hooks for each plugin and handler.
  * @property {Object.<number, Object.<string, *>>} properties Properties for
  *  each plugin.
  * @property {HhmRoomObject} room Associated room object.
@@ -40,29 +40,23 @@ class TrappedRoomManager {
    * @param {HhmRoomObject} room Room object.
    */
   constructor(room) {
-    const that = this;
     this._class = `TrappedRoomManager`;
 
-    // TODO turn into map
+    // TODO remove
     this.eventStateValidators = {};
     this.functionReflector = new HHM.classes.FunctionReflector(
         Math.floor((Math.random() * 10000) + 1));
 
-    // TODO turn into map
-    this.handlerExecutionOrders = {};
+    this.handlerExecutionOrders = new Map();
     this.handlerNames = new Set();
 
-    // TODO turn into map
-    this.handlers = {};
+    this.handlers = new Map();
     this.handlersDirty = true;
 
-    // TODO turn into map
-    this.postEventHandlerHooks = {};
-    // TODO turn into map
-    this.preEventHandlerHooks = {};
+    this.postEventHooks = new Map();
+    this.preEventHooks = new Map();
 
-    // TODO turn into map
-    this.properties = {};
+    this.properties = new Map();
 
     this.room = room;
     this.room._trappedRoomManager = this;
@@ -139,9 +133,7 @@ class TrappedRoomManager {
     const handlerObject = handler;
 
     const handlerObjectDefaults = {
-      data: {
-
-      },
+      data: {},
       functions: handler,
     };
 
@@ -152,6 +144,16 @@ class TrappedRoomManager {
         name: handlerName,
         plugin: this.room.getPlugin(pluginId),
         userHandler: handler,
+      },
+      data: {
+        'hhm/core': {
+          validators: new Map(), // TODO
+        }
+      },
+      addValidator: (validatorFn, plugin = { getName: () => `custom` },
+                     validatorName = plugin.getName() + Date.now()) => {
+        this.data[`hhm/core`].validators
+            .set(plugin.getName() + `::` + validatorName, validatorFn);
       },
     };
 
@@ -311,8 +313,8 @@ class TrappedRoomManager {
    * @param {number} pluginId Plugin ID.
    */
   _provideHandlerObjectForIdentifier(pluginId) {
-    if (!this.handlers.hasOwnProperty(pluginId)) {
-      this.handlers[pluginId] = {};
+    if (!this.handlers.has(pluginId)) {
+      this.handlers.set(pluginId, new Map());
     }
   }
 
@@ -328,8 +330,8 @@ class TrappedRoomManager {
    * @param {number} pluginId Plugin ID.
    */
   _providePropertyObjectForIdentifier(pluginId) {
-    if (!this.properties.hasOwnProperty(pluginId)) {
-      this.properties[pluginId] = {};
+    if (!this.properties.has(pluginId)) {
+      this.properties.set(pluginId, new Map());
     }
   }
 
@@ -389,7 +391,7 @@ class TrappedRoomManager {
    * @function TrappedRoomManager#determineExecutionOrders
    */
   determineExecutionOrders() {
-    this.handlerExecutionOrders = {};
+    this.handlerExecutionOrders.clear();
 
     for (let handlerName of this.handlerNames) {
       let pluginIds = [];
@@ -398,7 +400,7 @@ class TrappedRoomManager {
       for (let pluginId of this.room._pluginManager.plugins.keys()) {
         this._provideHandlerObjectForIdentifier(pluginId);
 
-        if (this.handlers[pluginId].hasOwnProperty(handlerName)) {
+        if (this.handlers.get(pluginId).has(handlerName)) {
           pluginIds.push(pluginId);
         }
       }
@@ -409,11 +411,22 @@ class TrappedRoomManager {
         continue;
       }
 
-      this.handlerExecutionOrders[handlerName] =
-          this.determineExecutionOrder(pluginIds, handlerName);
+      this.handlerExecutionOrders.set(handlerName,
+          this.determineExecutionOrder(pluginIds, handlerName));
     }
 
     this.handlersDirty = false;
+  }
+
+  /**
+   * Returns an `Array` of all registered handler names.
+   *
+   * @function PluginManager#getHandlerNames
+   * @returns {Array.<string>} Registered handler names.
+   */
+  getAllEventHandlerNames() {
+    return [...new Set(Array.from(this.handlers.keys())
+        .flatMap((pluginId) => Array.from(this.handlers.get(pluginId).keys())))];
   }
 
   /**
@@ -427,7 +440,7 @@ class TrappedRoomManager {
   getEventHandlerNames(_, pluginId) {
     this._provideHandlerObjectForIdentifier(pluginId);
 
-    return Object.getOwnPropertyNames(this.handlers[pluginId]);
+    return Array.from(this.handlers.get(pluginId).keys());
   }
 
   /**
@@ -440,7 +453,7 @@ class TrappedRoomManager {
    * @returns {(object.<*>|undefined)} Event handler object or undefined.
    */
   getEventHandlerObject(pluginId, handlerName) {
-    return (this.handlers[pluginId] || {})[handlerName];
+    return (this.handlers.get(pluginId) || new Map()).get(handlerName);
   }
 
   /**
@@ -449,14 +462,17 @@ class TrappedRoomManager {
    *
    * @function TrappedRoomManager#getEventHandlerObjects
    * @param {string} handlerName Event handler name.
-   * @returns {object.<number, object.<*>>} Event handler objects by plugin ID.
+   * @returns {Map.<number, object.<*>>} Event handler objects by plugin ID.
    */
-  getEventHandlerObjects(handlerName) {
-    return Object.getOwnPropertyNames(this.handlers)
-        .filter((pluginId) => this.handlers[pluginId][handlerName] !== undefined)
-        .map((pluginId) => [pluginId, this.handlers[pluginId][handlerName]])
-        .reduce((result, currentValue) =>
-          result[currentValue[0]] = currentValue[1], {});
+  getAllEventHandlerObjects(handlerName) {
+    const eventHandlerObjects = new Map();
+
+    Array.from(this.handlers.keys())
+        .filter((pluginId) => this.handlers.get(pluginId).has(handlerName))
+        .forEach((pluginId) => eventHandlerObjects.set(pluginId,
+          this.getEventHandlerObject(pluginId, handlerName)));
+
+    return eventHandlerObjects;
   }
 
   /**
@@ -475,7 +491,7 @@ class TrappedRoomManager {
   getPropertyNames(_, pluginId) {
     this._providePropertyObjectForIdentifier(pluginId);
 
-    return Object.getOwnPropertyNames(this.properties[pluginId]);
+    return Array.from(this.properties.get(pluginId).keys());
   }
 
   /**
@@ -490,7 +506,7 @@ class TrappedRoomManager {
   hasEventHandlers(_, pluginId) {
     this._provideHandlerObjectForIdentifier(pluginId);
 
-    return Object.getOwnPropertyNames(this.handlers[pluginId]).length > 0;
+    return this.handlers.get(pluginId).size > 0;
   }
 
   /**
@@ -508,7 +524,7 @@ class TrappedRoomManager {
   hasProperties(_, pluginId) {
     this._providePropertyObjectForIdentifier(pluginId);
 
-    return Object.getOwnPropertyNames(this.properties[pluginId])
+    return Array.from(this.properties.get(pluginId).keys())
         .filter(prop => !prop.startsWith('_')).length > 0;
   }
 
@@ -531,8 +547,10 @@ class TrappedRoomManager {
   onEventHandlerGet(_, handlerName, pluginId) {
     this._provideHandlerObjectForIdentifier(pluginId);
 
-    if (this.handlers[pluginId][handlerName] !== undefined) {
-      return this.handlers[pluginId][handlerName].meta.userHandler;
+    const handler = this.handlers.get(pluginId).get(handlerName);
+
+    if (handler !== undefined) {
+      return handler.meta.userHandler;
     }
   }
 
@@ -550,7 +568,7 @@ class TrappedRoomManager {
   onEventHandlerHas(_, handlerName, pluginId) {
     this._provideHandlerObjectForIdentifier(pluginId);
 
-    return this.handlers[pluginId].hasOwnProperty(handlerName);
+    return this.handlers.get(pluginId).has(handlerName);
   }
 
   /**
@@ -569,18 +587,20 @@ class TrappedRoomManager {
     this._provideHandlerObjectForIdentifier(pluginId);
     this.handlerNames.add(handlerName);
 
-    this.handlers[pluginId][handlerName] =
-        this._createHandlerObject(pluginId, handlerName, handler);
+    this.handlers.get(pluginId).set(handlerName,
+        this._createHandlerObject(pluginId, handlerName, handler));
 
     this.handlersDirty = true;
 
     this.room._pluginManager.triggerHhmEvent(HHM.events.EVENT_HANDLER_SET, {
-      handler: this.handlers[pluginId][handlerName],
+      handler: this.handlers.get(pluginId).get(handlerName),
     });
   }
 
   /**
    * Removes the registered event handler for the given handler and plugin name.
+   *
+   * TODO handle differently for onGameTick
    *
    * @function TrappedRoomManager#onEventHandlerUnset
    * @param {*} _ Unused.
@@ -591,10 +611,9 @@ class TrappedRoomManager {
     this._provideHandlerObjectForIdentifier(pluginId);
 
     // TODO retain handler object, but set to deleted?
-    const handler = this.handlers[pluginId][handlerName];
-    const plugin = this.room._pluginManager.getPlugin(pluginId);
+    const handler = this.handlers.get(pluginId).get(handlerName);
 
-    delete this.handlers[pluginId][handlerName];
+    this.handlers.get(pluginId).delete(handlerName);
 
     this.handlersDirty = true;
 
@@ -618,7 +637,7 @@ class TrappedRoomManager {
   onPropertyHas(_, propertyName, pluginId) {
     this._providePropertyObjectForIdentifier(pluginId);
 
-    return this.properties[pluginId].hasOwnProperty(propertyName)
+    return this.properties.get(pluginId).has(propertyName)
         || (!propertyName.startsWith(`_`)
             && this.room.hasOwnProperty(propertyName));
   }
@@ -635,7 +654,7 @@ class TrappedRoomManager {
   onOwnHandlerNamesGet(_, pluginId) {
     this._provideHandlerObjectForIdentifier(pluginId);
 
-    return Object.getOwnPropertyNames(this.handlers[pluginId]);
+    return Array.from(this.handlers.get(pluginId).keys());
   }
 
   /**
@@ -672,17 +691,18 @@ class TrappedRoomManager {
    * @param {*} _ Unused.
    * @param {string} handlerName Event handler name.
    * @param {number} pluginId Plugin ID.
-   * @returns {(Object|undefined)} Property descriptor or `undefined` if the
-   *  handler is not defined.
+   * @returns {Object} Property descriptor for the given handler.
    * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperty
    */
   onOwnHandlerDescriptorGet(_, handlerName, pluginId) {
     this._provideHandlerObjectForIdentifier(pluginId);
 
-    if (this.handlers[pluginId].hasOwnProperty(handlerName)) {
-      return Object.getOwnPropertyDescriptor(this.handlers[pluginId],
-          handlerName);
-    }
+    return {
+      enumerable: true,
+      configurable: true,
+      writable: true,
+      value: this.onEventHandlerGet(_, handlerName, pluginId)
+    };
   }
 
   /**
@@ -698,17 +718,12 @@ class TrappedRoomManager {
    * @returns {(Object|undefined)} Property descriptor or `undefined`.
    */
   onOwnPropertyDescriptorGet(_, propertyName, pluginId) {
-    this._providePropertyObjectForIdentifier(pluginId);
-
-    if (this.properties[pluginId].hasOwnProperty(propertyName)) {
-      return Object.getOwnPropertyDescriptor(this.properties[pluginId],
-          propertyName);
-    }
-
-    if (this.room.hasOwnProperty(propertyName)
-        && !propertyName.startsWith(`_`)) {
-      return Object.getOwnPropertyDescriptor(this.room, propertyName);
-    }
+    return {
+      enumerable: true,
+      configurable: true,
+      writable: true,
+      value: this.onPropertyGet(_, propertyName, pluginId)
+    };
   }
 
   /**
@@ -731,11 +746,10 @@ class TrappedRoomManager {
     const metadata = new EventHandlerExecutionMetadata(handlerName);
 
     // Execute pre-event handler hooks
-    if (this.preEventHandlerHooks[handlerName] !== undefined) {
+    if (this.preEventHooks.has(handlerName)) {
 
-      for (let pluginId of
-          Object.getOwnPropertyNames(this.preEventHandlerHooks[handlerName])
-              .map((id) => parseInt(id))) {
+      for (const [pluginId, pluginHandlerHooks] of
+          this.preEventHooks.get(handlerName).entries()) {
 
         if (!this._isPluginEnabledAndLoaded(pluginId)) {
           continue;
@@ -743,19 +757,19 @@ class TrappedRoomManager {
 
         const pluginName = this.room._pluginManager.getPluginName(pluginId);
 
-        for (let hook of this.preEventHandlerHooks[handlerName][pluginId]) {
+        for (const [id, hook] of pluginHandlerHooks.entries()) {
           try {
             let returnValue = hook({
               room: this.room,
-              // TODO pass object handler
-              metadata: metadata.forPlugin(pluginName)
+              // TODO plugin-specific metadata?
+              metadata: metadata
             }, ...args);
 
             args = Array.isArray(returnValue) ? returnValue : args;
             metadata.registerReturnValue(pluginName, returnValue);
           } catch (e) {
-            HHM.log.error(`Error during execution of pre-event handler hook ` +
-              `${handlerName} for plugin ${pluginName}`);
+            HHM.log.error(`Error during execution of pre-event hook ` +
+              `${id} (handler ${handlerName}) for plugin ${pluginName}`);
             HHM.log.error(e);
           }
         }
@@ -763,8 +777,8 @@ class TrappedRoomManager {
     }
 
     // Execute event handlers
-    if (this.handlerExecutionOrders.hasOwnProperty(handlerName)) {
-      for (let pluginId of this.handlerExecutionOrders[handlerName]) {
+    if (this.handlerExecutionOrders.has(handlerName)) {
+      for (let pluginId of this.handlerExecutionOrders.get(handlerName)) {
         // Skip disabled plugins
         if (!this._isPluginEnabledAndLoaded(pluginId)) {
           continue;
@@ -775,15 +789,15 @@ class TrappedRoomManager {
           break;
         }
 
-        this.executeHandler(this.handlers[pluginId][handlerName], metadata,
-                ...args);
+        this.executeHandler(this.handlers.get(pluginId).get(handlerName),
+            metadata, ...args);
       }
     }
 
-    // Execute post-event handler hooks
-    if (this.postEventHandlerHooks[handlerName] !== undefined) {
-      for (let pluginId of Object.getOwnPropertyNames(
-          this.postEventHandlerHooks[handlerName]).map((id) => parseInt(id))) {
+    // Execute post-event hooks
+    if (this.postEventHooks.has(handlerName)) {
+      const handlerHooks = this.postEventHooks.get(handlerName);
+      for (const [pluginId, pluginHandlerHooks] of handlerHooks.entries()) {
 
         if (!this._isPluginEnabledAndLoaded(pluginId)) {
           continue;
@@ -791,13 +805,13 @@ class TrappedRoomManager {
 
         const pluginName = this.room._pluginManager.getPluginName(pluginId);
 
-        for (let hook of this.postEventHandlerHooks[handlerName][pluginId]) {
+        for (const [id, hook] of pluginHandlerHooks.entries()) {
           try {
-            // TODO pass handler object
-            hook({ room: this.room, metadata: metadata.forPlugin(pluginName) }, ...args);
+            // TODO plugin-specific metadata?
+            hook({ room: this.room, metadata: metadata }, ...args);
           } catch (e) {
-            HHM.log.error(`Error during execution of post-event handler hook ` +
-                `${handlerName} for plugin ${pluginName}`);
+            HHM.log.error(`Error during execution of post-event hook ` +
+                `${id} (handler ${handlerName}) for plugin ${pluginName}`);
             HHM.log.error(e);
           }
         }
@@ -823,14 +837,13 @@ class TrappedRoomManager {
   onPropertyGet(_, propertyName, pluginId) {
     this._providePropertyObjectForIdentifier(pluginId);
 
-    if (typeof this.properties[pluginId][propertyName] !== `undefined` ||
-        propertyName.startsWith(`_`)) {
-      return this.properties[pluginId][propertyName];
+    const pluginProperties = this.properties.get(pluginId);
+
+    if (pluginProperties.has(propertyName) || propertyName.startsWith(`_`)) {
+      return pluginProperties.get(propertyName);
     }
 
-    if (typeof this.room[propertyName] !== `undefined`) {
-      return this.room[propertyName];
-    }
+    return this.room[propertyName];
   }
 
   /**
@@ -845,8 +858,10 @@ class TrappedRoomManager {
   onPropertySet(_, propertyName, value, pluginId) {
     this._providePropertyObjectForIdentifier(pluginId);
 
-    let valueOld = this.properties[pluginId][propertyName];
-    this.properties[pluginId][propertyName] = value;
+    const pluginProperties = this.properties.get(pluginId);
+
+    let valueOld = pluginProperties.get(propertyName);
+    pluginProperties.set(propertyName, value);
 
     this.room._pluginManager.triggerHhmEvent(HHM.events.PROPERTY_SET, {
       plugin: this.room._pluginManager.getPlugin(pluginId),
@@ -867,15 +882,19 @@ class TrappedRoomManager {
   onPropertyUnset(_, propertyName, pluginId) {
     this._providePropertyObjectForIdentifier(pluginId);
 
-    const propertyValue = this.properties[pluginId][propertyName];
+    const pluginProperties = this.properties.get(pluginId);
 
-    delete this.properties[pluginId][propertyName];
+    const propertyValue = pluginProperties.get(propertyName);
 
-    this.room._pluginManager.triggerHhmEvent(HHM.events.PROPERTY_UNSET, {
-      plugin: this.room._pluginManager.getPlugin(pluginId),
-      propertyName: propertyName,
-      propertyValue: propertyValue,
-    });
+    const returnValue = pluginProperties.delete(propertyName);
+
+    if (returnValue) {
+      this.room._pluginManager.triggerHhmEvent(HHM.events.PROPERTY_UNSET, {
+        plugin: this.room._pluginManager.getPlugin(pluginId),
+        propertyName: propertyName,
+        propertyValue: propertyValue,
+      });
+    }
   }
 
   /**
@@ -883,6 +902,8 @@ class TrappedRoomManager {
    *
    * Must be called by {@link PluginManager#removePlugin} to ensure overall
    * consistency.
+   *
+   * TODO remove hooks for the plugin
    *
    * @function TrappedRoomManager#removePluginHandlersAndProperties
    * @param {number} pluginId Plugin ID.
@@ -892,8 +913,8 @@ class TrappedRoomManager {
       return;
     }
 
-    delete this.properties[pluginId];
-    delete this.handlers[pluginId];
+    this.properties.delete(pluginId);
+    this.handlers.delete(pluginId);
     this.handlersDirty = true;
   }
 
@@ -942,19 +963,23 @@ class TrappedRoomManager {
    * Hooks are passed the room object and the event arguments. If the hook
    * returns an `Array` it will be used to overwrite the event arguments.
    *
-   * @function TrappedRoomManager#addPostEventHandlerHook
+   * @function TrappedRoomManager#addPreEventHook
    * @param {number} pluginId Plugin ID.
    * @param {(string|Array.<string>)} handlerNames Event handler name(s).
    * @param {Function} hook Function hook.
+   * @param {(string|number)} [id] Unique identifier of this hook within the
+   *  hooks for the given plugin and handler names. Use a custom name or leave
+   *  undefined to use the hook function hash.
    * @returns {TrappedRoomManager} The trapped room manager, enables method
    *  chaining.
    */
-  addPreEventHandlerHook(pluginId, handlerNames, hook) {
+  addPreEventHook(pluginId, handlerNames, hook,
+                  id = hashFunction(hook.toString(), hashSeed)) {
     // TODO turn hook into handler object
     if (typeof handlerNames === `object` &&
         typeof handlerNames[Symbol.iterator] === 'function') {
       for (let handlerName of handlerNames) {
-        this.addPreEventHandlerHook(pluginId, handlerName, hook);
+        this.addPreEventHook(pluginId, handlerName, hook, id);
       }
 
       return this;
@@ -962,15 +987,17 @@ class TrappedRoomManager {
 
     let handlerName = String(handlerNames);
 
-    if (this.preEventHandlerHooks[handlerName] === undefined) {
-      this.preEventHandlerHooks[handlerName] = {};
+    if (!this.preEventHooks.has(handlerName)) {
+      this.preEventHooks.set(handlerName, new Map());
     }
 
-    if (this.preEventHandlerHooks[handlerName][pluginId] === undefined) {
-      this.preEventHandlerHooks[handlerName][pluginId] = [];
+    const handlerHooks = this.preEventHooks.get(handlerName);
+
+    if (!handlerHooks.has(pluginId)) {
+      handlerHooks.set(pluginId, new Map());
     }
 
-    this.preEventHandlerHooks[handlerName][pluginId].push(hook);
+    handlerHooks.get(pluginId).set(id, hook);
 
     this._provideHandler(pluginId, handlerName);
 
@@ -978,7 +1005,7 @@ class TrappedRoomManager {
   }
 
   /**
-   * Add a hook for the given handler names that is executed after plugin
+   * Add a hook for the given handler names that is executed after all plugin
    * event handlers.
    *
    * It is executed regardless of event state validity.
@@ -986,19 +1013,23 @@ class TrappedRoomManager {
    * Hooks are passed the room object, a metadata object, and the event
    * arguments.
    *
-   * @function TrappedRoomManager#addPostEventHandlerHook
+   * @function TrappedRoomManager#addPostEventHook
    * @param {number} pluginId Plugin ID.
    * @param {(string|Array.<string>)} handlerNames Event handler name(s).
    * @param {Function} hook Function hook.
+   * @param {(string|number)} [id] Unique identifier of this hook within the
+   *  hooks for the given plugin and handler names. Use a custom name or leave
+   *  undefined to use the hook function hash.
    * @returns {TrappedRoomManager} The trapped room manager, enables method
    *  chaining.
    */
-  addPostEventHandlerHook(pluginId, handlerNames, hook) {
+  addPostEventHook(pluginId, handlerNames, hook,
+                   id = hashFunction(hook.toString(), hashSeed)) {
     // TODO turn hook into handler object
     if (typeof handlerNames === `object` &&
         typeof handlerNames[Symbol.iterator] === 'function') {
       for (let handlerName of handlerNames) {
-        this.addPostEventHandlerHook(pluginId, handlerName, hook);
+        this.addPostEventHook(pluginId, handlerName, hook, id);
       }
 
       return this;
@@ -1006,15 +1037,17 @@ class TrappedRoomManager {
 
     let handlerName = String(handlerNames);
 
-    if (this.postEventHandlerHooks[handlerName] === undefined) {
-      this.postEventHandlerHooks[handlerName] = {};
+    if (!this.postEventHooks.has(handlerName)) {
+      this.postEventHooks.set(handlerName, new Map());
     }
 
-    if (this.postEventHandlerHooks[handlerName][pluginId] === undefined) {
-      this.postEventHandlerHooks[handlerName][pluginId] = [];
+    const handlerHooks = this.postEventHooks.get(handlerName);
+
+    if (!handlerHooks.has(pluginId)) {
+      handlerHooks.set(pluginId, new Map());
     }
 
-    this.postEventHandlerHooks[handlerName][pluginId].push(hook);
+    handlerHooks.get(pluginId).set(id, hook);
 
     this._provideHandler(pluginId, handlerName);
 
