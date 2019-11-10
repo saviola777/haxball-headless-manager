@@ -5,9 +5,9 @@
  *  execution, this value is `true` until the first (pre) event handler returns
  *  `false`, and cannot change back to `true` afterwards.
  * @property {string} handlerName Name of the executed event handlers.
- * @property {Map.<string, Array.<*>>} handlerReturnValues Array of return
- *  values of handlers by plugin name. Return values can be `boolean` as well as
- *  complex types.
+ * @property {Map.<string, Map.<*, *>>} handlerReturnValues Map of return
+ *  values of handlers and hooks by plugin name. Return values can be `boolean`
+ *  as well as complex types.
  * @property {Array.<string>} handlerPlugins Array of plugins which have
  *  handled this event.
  * @property {Map.<string, *>} data Additional custom event handling
@@ -16,12 +16,14 @@
  * @class EventHandlerExecutionMetadata
  */
 class EventHandlerExecutionMetadata {
-  constructor(handlerName) {
+  constructor(handlerName, ...args) {
     this._class = `EventHandlerExecutionMetadata`;
     this.returnValue = true;
     this.handlerName = handlerName;
     this.handlerReturnValues = new Map();
     this.handlerPlugins = [];
+    this.handlers = [];
+    this.args = args;
     this.data = new Map();
   }
 
@@ -37,7 +39,7 @@ class EventHandlerExecutionMetadata {
    */
   _provideHandlerReturnValuesObject(pluginName, pushToHandlers = false) {
     if (!this.handlerReturnValues.has(pluginName)) {
-      this.handlerReturnValues.set(pluginName, []);
+      this.handlerReturnValues.set(pluginName, new Map());
       if (pushToHandlers === true) this.handlerPlugins.push(pluginName);
     }
   }
@@ -64,30 +66,60 @@ class EventHandlerExecutionMetadata {
    * @param {string} property Name of the property.
    * @param {string} pluginName Name of the plugin.
    * @returns {(undefined|*)} The stored value or undefined if no value is
-   *  stored for the property and plugin nanem.
+   *  stored for the property and plugin name.
    */
   get(property, pluginName) {
     return (this.data.get(pluginName) || {})[property];
   }
 
   /**
-   * Returns the current overall return value or plugin return value.
+   * Returns the current event arguments.
+   *
+   * Arguments can be transformed by event handlers and this function will
+   * reflect these changes.
+   *
+   * @function EventHandlerExecutionMetadata#getArgs
+   * @returns {(undefined|Array.<*>)} Array of all event arguments.
+   */
+  getArgs() {
+    return this.args;
+  }
+
+  /**
+   * Returns the current event handler objects.
+   *
+   * For pre-event hooks, this contains all handlers that will be executed.
+   * For pre-event handler hooks, this contains the current event handler.
+   * For post-event handler hooks, this contains the current event handler.
+   * For post-event hooks, this contains all handlers that were executed.
+   *
+   * @function EventHandlerExecutionMetadata#getArgs
+   * @returns {Map.<number, object>} Map of event handler objects by plugin ID.
+   */
+  getHandlers() {
+    return this.handlers;
+  }
+
+  /**
+   * Returns the current overall return value or plugin return value(s).
    *
    * @function EventHandlerExecutionMetadata#getReturnValue
-   * @param {string} pluginName Name of the plugin for which you want to
+   * @param {string} [pluginName] Name of the plugin for which you want to
    *  retrieve the registered return values.
+   * @param {*} [id] ID of the handler or hook.
    * @returns {(boolean|*)} The overall return value if no parameters are given,
-   * otherwise it returns the return value of the first handler for the given
-   * plugin or `undefined` if no return values have been registered for the
-   * given plugin.
+   * Map of return values for the given plugin if no id is given, or return
+   * value for the given handler/hook ID or undefined.
    */
-  getReturnValue(pluginName) {
+  getReturnValue(pluginName, id) {
     if (pluginName === undefined) {
       return this.returnValue;
-    } else {
-      this._provideHandlerReturnValuesObject(pluginName);
-      return this.handlerReturnValues.get(pluginName).slice(-1)[0];
     }
+
+    this._provideHandlerReturnValuesObject(pluginName);
+
+    return id === undefined ? this.handlerReturnValues.get(pluginName) :
+        this.handlerReturnValues.get(pluginName).get(id);
   }
 
   /**
@@ -98,12 +130,18 @@ class EventHandlerExecutionMetadata {
    * @param {*} returnValue Return value of the event handler, can be anyhting.
    *  If it is `false` and the `returnValue` of this metadata object has been
    *  `true`, it will be changed to false.
+   * @param {*} [id] ID of the handler or hook that returned this value. By
+   *  convention, this is the hook ID for pre-event (handler) hooks and the
+   *  handler name for the actual event handler.
    * @returns {EventHandlerExecutionMetadata} The metadata object.
    */
-  registerReturnValue(pluginName, returnValue) {
+  registerReturnValue(pluginName, returnValue, id = this.handlerName) {
     this._provideHandlerReturnValuesObject(pluginName, true);
 
-    this.handlerReturnValues.get(pluginName).push(returnValue);
+    this.handlerReturnValues.get(pluginName).set(id, returnValue);
+
+    this.args = Array.isArray(returnValue) ? returnValue : this.args;
+
     this.returnValue = returnValue !== false && this.returnValue;
 
     return this;
@@ -123,6 +161,20 @@ class EventHandlerExecutionMetadata {
     this.data.set(pluginName, this.data.get(pluginName) || {});
 
     this.data.get(pluginName)[property] = value;
+
+    return this;
+  }
+
+  /**
+   * Sets the context handlers.
+   *
+   * @function EventHandlerExecutionMetadata#setHandlers
+   * @param {Map.<number, object>} handlers Map of handler objects by plugin ID.
+   * @returns {EventHandlerExecutionMetadata} The metadata object.
+   *
+   */
+  setHandlers(handlers) {
+    this.handlers = handlers;
 
     return this;
   }
@@ -147,19 +199,33 @@ class Proxy {
   }
 
   /**
+   * Returns the current event arguments.
+   *
+   * @function EventHandlerExecutionMetadata~Proxy#getArgs
+   * @see EventHandlerExecutionMetadata#getArgs
+   */
+  getArgs() {
+    return this.metadata.args;
+  }
+
+  /**
+   * Returns the current event handler objects.
+   *
+   * @function EventHandlerExecutionMetadata~Proxy#getHandlers
+   * @see EventHandlerExecutionMetadata#getArgs
+   */
+  getHandlers() {
+    return this.metadata.handlers;
+  }
+
+  /**
    * Returns the current overall return value or plugin return value.
    *
    * @function EventHandlerExecutionMetadata~Proxy#getReturnValue
-   * @param {string} [pluginName] Name of the plugin for which you want to
-   *  retrieve the registered return values.
-   * @returns {(boolean|*)} The overall return value if no parameters are given,
-   *  otherwise it returns the return value of the first handler for the given
-   *  plugin or `undefined` if no return values have been registered for the
-   *  given plugin.
    * @see EventHandlerExecutionMetadata#getReturnValue
    */
-  getReturnValue(pluginName) {
-    return this.metadata.getReturnValue(pluginName);
+  getReturnValue(pluginName, id) {
+    return this.metadata.getReturnValue(pluginName, id);
   }
 
   /**
@@ -175,7 +241,7 @@ class Proxy {
    * @see EventHandlerExecutionMetadata#get
    */
   get(property, pluginName = this.pluginName) {
-    return this.metadata.get(pluginName, property);
+    return this.metadata.get(property, pluginName);
   }
 
   /**

@@ -23,10 +23,17 @@ const EventHandlerExecutionMetadata = require(`./EventHandlerExecutionMetadata`)
  *  handlers for each plugin.
  * @property {boolean} handlersDirty Whether handlers have been changed since
  *  the last call to {@link TrappedRoomManager#determineExecutionOrders}.
+ * @property {Map<string, Map.<number, Map.<string, Function>>>}
+ *  postEventHandlerHooks `Map` of post-event handler hooks for each plugin and
+ *  handler.
  * @property {Map.<string, Map.<number, Map.<string, Function>>>}
  *  postEventHooks `Map` of post-event hooks for each plugin and handler.
+ * @property {Map<string, Map.<number, Map.<string, Function>>>}
+ *  preEventHandlerHooks `Map` of pre-event handler hooks for each plugin and
+ *  handler.
  * @property {Map.<string, Map.<number, Map.<string, Function>>>}
  *  preEventHooks `Map` of pre-event hooks for each plugin and handler.
+ *
  * @property {Object.<number, Object.<string, *>>} properties Properties for
  *  each plugin.
  * @property {HhmRoomObject} room Associated room object.
@@ -56,10 +63,60 @@ class TrappedRoomManager {
     this.postEventHooks = new Map();
     this.preEventHooks = new Map();
 
+    this.preEventHandlerHooks = new Map();
+    this.postEventHandlerHooks = new Map();
+
     this.properties = new Map();
 
     this.room = room;
     this.room._trappedRoomManager = this;
+  }
+
+  /**
+   * Helper function which adds a hook to a map of hooks.
+   *
+   * @function TrappedRoomManager#_addHook
+   * @private
+   * @param {object} that To support method chaining, this object will be
+   *  returned.
+   * @param {Map.<string, Map.<number, Map.<string, Function>>>} hooks Map of
+   *  hooks by handler name, plugin ID and hook ID.
+   * @param {number} pluginId
+   * @param {(string|Iterable)} handlerNames
+   * @param {Function} hook
+   * @param {string} [hookId] Unique hook identifier for the plugin and handler.
+   * @returns {*} The argument `that`.
+   */
+  _addHook(that, hooks, pluginId, handlerNames, hook,
+          hookId = hook.toString()) {
+
+    if (typeof handlerNames === `object` &&
+        typeof handlerNames[Symbol.iterator] === 'function') {
+      for (let handlerName of handlerNames) {
+        this._addHook(that, hooks, pluginId, handlerName, hook, hookId);
+      }
+
+      return that;
+    }
+
+    let handlerName = String(handlerNames);
+
+    if (!hooks.has(handlerName)) {
+      hooks.set(handlerName, new Map());
+    }
+
+    const handlerHooks = hooks.get(handlerName);
+
+
+    if (!handlerHooks.has(pluginId)) {
+      handlerHooks.set(pluginId, new Map());
+    }
+
+    handlerHooks.get(pluginId).set(hookId, hook);
+
+    this._provideHandler(pluginId, handlerName);
+
+    return that;
   }
 
   /**
@@ -130,6 +187,7 @@ class TrappedRoomManager {
   _createHandlerObject(pluginId, handlerName, handler,
                        additionalObjectDefaults = {}) {
 
+    const that = this;
     const handlerObject = handler;
 
     const handlerObjectDefaults = {
@@ -138,7 +196,7 @@ class TrappedRoomManager {
     };
 
     const handlerObjectRequiredElements = {
-      execute: (...args) => this.executeHandler(handlerObjectDefaults,
+      execute: (metadata, ...args) => this.executeHandler(handlerObjectDefaults,
             new EventHandlerExecutionMetadata(handlerName, ...args)),
       meta: {
         name: handlerName,
@@ -147,13 +205,17 @@ class TrappedRoomManager {
       },
       data: {
         'hhm/core': {
-          validators: new Map(), // TODO
+          preEventHandlerHooks: new Map(),
+          postEventHandlerHooks: new Map(),
         }
       },
-      addValidator: (validatorFn, plugin = { getName: () => `custom` },
-                     validatorName = plugin.getName() + Date.now()) => {
-        this.data[`hhm/core`].validators
-            .set(plugin.getName() + `::` + validatorName, validatorFn);
+      addPreEventHandlerHook: (plugin, hook, hookId) => {
+        return that._addHook(this, this.data[`hhm/core`].preEventHandlerHooks,
+            plugin.id, handlerName, hook, hookId);
+      },
+      addPostEventHandlerHook: (plugin, hook, hookId) => {
+        return that._addHook(this, this.data[`hhm/core`].postEventHandlerHooks,
+            plugin.id, handlerName, hook, hookId);
       },
     };
 
@@ -170,7 +232,7 @@ class TrappedRoomManager {
    * @param {...*} args Event arguments.
    * @returns {EventHandlerExecutionMetadata} Event metadata.
    */
-  executeHandler(handlerObject, metadata, ...args) {
+  executeHandler(handlerObject, metadata) {
 
     handlerObject.metadata = metadata;
 
@@ -178,27 +240,11 @@ class TrappedRoomManager {
 
     // TODO do we expect a non object handler?
     if (typeof handlerFunctions === `function`) {
-      this._executeHandlerFunction(handlerFunctions, handlerObject, metadata,
-          ...args);
+      this._executeHandlerFunction(handlerFunctions, handlerObject, metadata);
     }
-     else if (typeof handlerFunctions !== `object`) {
+     else {
       // TODO support string handlers?
       HHM.log.warn(`Invalid handler type: ${typeof handlerFunctions}`);
-    }
-
-    // Iterable
-    else if (typeof handlerFunctions[Symbol.iterator] === `function`) {
-      for (let h of handlerFunctions) {
-        this._executeHandlerFunction(h, handlerObject, metadata, ...args);
-      }
-    }
-
-    else {
-      // Object iteration
-      for (let h of Object.getOwnPropertyNames(handlerFunctions)) {
-        this._executeHandlerFunction(handlerFunctions[h], handlerObject,
-            metadata, ...args);
-      }
     }
 
     return metadata;
@@ -212,10 +258,11 @@ class TrappedRoomManager {
    * @param {EventHandlerExecutionMetadata} metadata Event metadata.
    * @param {...*} args Event arguments.
    */
-  _executeHandlerFunction(handlerFunction, handlerObject, metadata,
-      ...args) {
+  _executeHandlerFunction(handlerFunction, handlerObject, metadata) {
 
     const pluginName = handlerObject.meta.plugin.getName();
+
+    let args = metadata.args;
 
     let extraArgsPosition = this.functionReflector
         .getArgumentInjectionPosition(handlerFunction, args);
@@ -232,6 +279,40 @@ class TrappedRoomManager {
       HHM.log.error(`Error during execution of handler ` +
           `${metadata.handlerName} for plugin ${pluginName}`);
       HHM.log.error(e);
+    }
+  }
+
+  _executeHooks(hooks, handlerName, metadata) {
+    if (!hooks.has(handlerName)) {
+      return;
+    }
+
+    for (const [pluginId, pluginHandlerHooks] of
+        hooks.get(handlerName).entries()) {
+
+      if (!this._isPluginEnabledAndLoaded(pluginId)) {
+        continue;
+      }
+
+      const pluginName = this.room._pluginManager.getPluginName(pluginId);
+
+      for (const [id, hook] of pluginHandlerHooks.entries()) {
+        let returnValue = false;
+
+        try {
+          // TODO plugin-specific metadata?
+          returnValue = hook({ room: this.room, metadata: metadata },
+              ...metadata.args);
+
+          if (returnValue !== undefined) {
+            metadata.registerReturnValue(pluginName, returnValue, id);
+          }
+        } catch (e) {
+          HHM.log.error(`Error during execution of hook ` +
+              `${id} (handler ${handlerName}) for plugin ${pluginName}`);
+          HHM.log.error(e);
+        }
+      }
     }
   }
 
@@ -265,7 +346,7 @@ class TrappedRoomManager {
    * @returns {boolean} `false` if one of the event state validators returned
    *  `false`, `true` otherwise.
    */
-  _isValidEventState(handlerName, metadata, ...args) {
+  _isValidEventState(handlerName, metadata) {
     // If no validator was set, all states are considered valid
     if (this.eventStateValidators[handlerName] === undefined) {
       return true;
@@ -276,7 +357,7 @@ class TrappedRoomManager {
         Object.getOwnPropertyNames(this.eventStateValidators[handlerName])) {
 
       for (let validator of this.eventStateValidators[handlerName][pluginName]) {
-        if (validator({ metadata: metadata }, ...args) === false) {
+        if (validator({ metadata: metadata }, ...metadata.args) === false) {
           return false;
         }
       }
@@ -296,7 +377,10 @@ class TrappedRoomManager {
    */
   _provideHandler(pluginId, handlerName) {
     // Make sure the handler is registered
+    // TODO can this ever become undefined later on? If so, check for plugin
+    //  handler instead of global handler
     if (this.room[handlerName] === undefined) {
+      // TODO distinguish no-op handler from user-defined handler
       this.room._pluginManager.getPlugin(pluginId)[handlerName] = () => {};
     }
   }
@@ -743,79 +827,60 @@ class TrappedRoomManager {
       this.determineExecutionOrders();
     }
 
-    const metadata = new EventHandlerExecutionMetadata(handlerName);
+    const metadata = new EventHandlerExecutionMetadata(handlerName, ...args);
 
-    // Execute pre-event handler hooks
+    metadata.setHandlers(this.getAllEventHandlerObjects(handlerName));
+
+    // Execute pre-event hooks
     if (this.preEventHooks.has(handlerName)) {
-
-      for (const [pluginId, pluginHandlerHooks] of
-          this.preEventHooks.get(handlerName).entries()) {
-
-        if (!this._isPluginEnabledAndLoaded(pluginId)) {
-          continue;
-        }
-
-        const pluginName = this.room._pluginManager.getPluginName(pluginId);
-
-        for (const [id, hook] of pluginHandlerHooks.entries()) {
-          try {
-            let returnValue = hook({
-              room: this.room,
-              // TODO plugin-specific metadata?
-              metadata: metadata
-            }, ...args);
-
-            args = Array.isArray(returnValue) ? returnValue : args;
-            metadata.registerReturnValue(pluginName, returnValue);
-          } catch (e) {
-            HHM.log.error(`Error during execution of pre-event hook ` +
-              `${id} (handler ${handlerName}) for plugin ${pluginName}`);
-            HHM.log.error(e);
-          }
-        }
-      }
+      this._executeHooks(this.preEventHooks, handlerName, metadata);
     }
 
+    let preEventReturnValue = metadata.getReturnValue();
+
     // Execute event handlers
-    if (this.handlerExecutionOrders.has(handlerName)) {
+    if (this.handlerExecutionOrders.has(handlerName) && preEventReturnValue) {
+
+      let executedHandlers = new Map();
+
       for (let pluginId of this.handlerExecutionOrders.get(handlerName)) {
+
         // Skip disabled plugins
         if (!this._isPluginEnabledAndLoaded(pluginId)) {
           continue;
         }
 
-        // Abort if event state not valid
-        if (!this._isValidEventState(handlerName, metadata, ...args)) {
-          break;
-        }
+        const handlerObject = this.handlers.get(pluginId).get(handlerName);
 
-        this.executeHandler(this.handlers.get(pluginId).get(handlerName),
-            metadata, ...args);
+        metadata.setHandlers(new Map([[pluginId, handlerObject]]));
+
+        // Execute pre-event handler hooks for this handler name
+        this._executeHooks(this.preEventHandlerHooks, handlerName, metadata);
+
+        // Execute pre-event handler hooks for this specific event handler
+        this._executeHooks(handlerObject.data[`hhm/core`].preEventHandlerHooks,
+            handlerName, metadata);
+
+        // Only execute if none of the pre-event (handler) hooks returned false
+        if (metadata.getReturnValue() === true) {
+          this.executeHandler(handlerObject, metadata);
+          executedHandlers.set(pluginId, handlerObject);
+
+          // Execute post-event handler hooks for this specific event handler
+          this._executeHooks(this.postEventHandlerHooks, handlerName, metadata);
+
+          // Execute post-event handler hooks for this handler name
+          this._executeHooks(handlerObject.data[`hhm/core`].postEventHandlerHooks,
+              handlerName, metadata);
+        }
       }
+
+      metadata.setHandlers(executedHandlers);
     }
 
     // Execute post-event hooks
-    if (this.postEventHooks.has(handlerName)) {
-      const handlerHooks = this.postEventHooks.get(handlerName);
-      for (const [pluginId, pluginHandlerHooks] of handlerHooks.entries()) {
-
-        if (!this._isPluginEnabledAndLoaded(pluginId)) {
-          continue;
-        }
-
-        const pluginName = this.room._pluginManager.getPluginName(pluginId);
-
-        for (const [id, hook] of pluginHandlerHooks.entries()) {
-          try {
-            // TODO plugin-specific metadata?
-            hook({ room: this.room, metadata: metadata }, ...args);
-          } catch (e) {
-            HHM.log.error(`Error during execution of post-event hook ` +
-                `${id} (handler ${handlerName}) for plugin ${pluginName}`);
-            HHM.log.error(e);
-          }
-        }
-      }
+    if (this.postEventHooks.has(handlerName) && preEventReturnValue) {
+      this._executeHooks(this.postEventHooks, handlerName, metadata);
     }
 
     return metadata.returnValue;
@@ -928,6 +993,7 @@ class TrappedRoomManager {
    * @param {number} pluginId Plugin ID.
    * @param {string} handlerNames Event handler name(s).
    * @param {Function} validator Validator function.
+   * @deprecated Use pre-event handler hook instead
    * @returns {TrappedRoomManager} The trapped room manager, enables method
    *  chaining.
    */
@@ -957,6 +1023,31 @@ class TrappedRoomManager {
   }
 
   /**
+   * Add a hook for the given handler names that is executed before every
+   * single plugin event handler.
+   *
+   * Hooks are passed the room and handler objects and the event arguments. If
+   * the hook returns an `Array` it will be used to overwrite the event
+   * arguments. If it returns `false`, the event handler will not be executed.
+   *
+   * @function TrappedRoomManager#addPreEventHook
+   * @param {number} pluginId Plugin ID.
+   * @param {(string|Array.<string>)} handlerNames Event handler name(s).
+   *  hooks for the given plugin and handler names.
+   * @param {Function} hook Function hook.
+   * @param {*} [hookId] Unique identifier of this hook within the
+   *  hooks for the given plugin and handler names, defaults to the hook code.
+   * @returns {TrappedRoomManager} The trapped room manager, enables method
+   *  chaining.
+   */
+  addPreEventHandlerHook(pluginId, handlerNames, hook, hookId) {
+    this._addHook(this, this.preEventHandlerHooks, pluginId, handlerNames, hook,
+        hookId);
+
+    return this;
+  }
+
+  /**
    * Add a hook for the given handler names that is executed before plugin
    * event handlers.
    *
@@ -967,39 +1058,37 @@ class TrappedRoomManager {
    * @param {number} pluginId Plugin ID.
    * @param {(string|Array.<string>)} handlerNames Event handler name(s).
    * @param {Function} hook Function hook.
-   * @param {(string|number)} [id] Unique identifier of this hook within the
-   *  hooks for the given plugin and handler names. Use a custom name or leave
-   *  undefined to use the hook function hash.
+   * @param {*} [hookId] Unique identifier of this hook within the
+   *  hooks for the given plugin and handler names, defaults to the hook code.
    * @returns {TrappedRoomManager} The trapped room manager, enables method
    *  chaining.
    */
-  addPreEventHook(pluginId, handlerNames, hook,
-                  id = hashFunction(hook.toString(), hashSeed)) {
-    // TODO turn hook into handler object
-    if (typeof handlerNames === `object` &&
-        typeof handlerNames[Symbol.iterator] === 'function') {
-      for (let handlerName of handlerNames) {
-        this.addPreEventHook(pluginId, handlerName, hook, id);
-      }
+  addPreEventHook(pluginId, handlerNames, hook, hookId) {
+    this._addHook(this, this.preEventHooks, pluginId, handlerNames, hook,
+        hookId);
 
-      return this;
-    }
+    return this;
+  }
 
-    let handlerName = String(handlerNames);
-
-    if (!this.preEventHooks.has(handlerName)) {
-      this.preEventHooks.set(handlerName, new Map());
-    }
-
-    const handlerHooks = this.preEventHooks.get(handlerName);
-
-    if (!handlerHooks.has(pluginId)) {
-      handlerHooks.set(pluginId, new Map());
-    }
-
-    handlerHooks.get(pluginId).set(id, hook);
-
-    this._provideHandler(pluginId, handlerName);
+  /**
+   * Add a hook for the given handler names that is executed after every single
+   * plugin event handler.
+   *
+   * Hooks are passed the room and handler objects, the handler return value,
+   * a metadata object, and the event arguments.
+   *
+   * @function TrappedRoomManager#addPostEventHook
+   * @param {number} pluginId Plugin ID.
+   * @param {(string|Array.<string>)} handlerNames Event handler name(s).
+   * @param {Function} hook Function hook.
+   * @param {*} [hookId] Unique identifier of this hook within the
+   *  hooks for the given plugin and handler names, defaults to the hook code.
+   * @returns {TrappedRoomManager} The trapped room manager, enables method
+   *  chaining.
+   */
+  addPostEventHandlerHook(pluginId, handlerNames, hook, hookId) {
+    this._addHook(this, this.postEventHandlerHooks, pluginId, handlerNames,
+        hook, hookId);
 
     return this;
   }
@@ -1016,42 +1105,16 @@ class TrappedRoomManager {
    * @function TrappedRoomManager#addPostEventHook
    * @param {number} pluginId Plugin ID.
    * @param {(string|Array.<string>)} handlerNames Event handler name(s).
+   *  hooks for the given plugin and handler names.
    * @param {Function} hook Function hook.
-   * @param {(string|number)} [id] Unique identifier of this hook within the
-   *  hooks for the given plugin and handler names. Use a custom name or leave
-   *  undefined to use the hook function hash.
+   * @param {*} [hookId] Unique identifier of this hook within the
+   *  hooks for the given plugin and handler names, defaults to the hook code.
    * @returns {TrappedRoomManager} The trapped room manager, enables method
    *  chaining.
    */
-  addPostEventHook(pluginId, handlerNames, hook,
-                   id = hashFunction(hook.toString(), hashSeed)) {
-    // TODO turn hook into handler object
-    if (typeof handlerNames === `object` &&
-        typeof handlerNames[Symbol.iterator] === 'function') {
-      for (let handlerName of handlerNames) {
-        this.addPostEventHook(pluginId, handlerName, hook, id);
-      }
-
-      return this;
-    }
-
-    let handlerName = String(handlerNames);
-
-    if (!this.postEventHooks.has(handlerName)) {
-      this.postEventHooks.set(handlerName, new Map());
-    }
-
-    const handlerHooks = this.postEventHooks.get(handlerName);
-
-    if (!handlerHooks.has(pluginId)) {
-      handlerHooks.set(pluginId, new Map());
-    }
-
-    handlerHooks.get(pluginId).set(id, hook);
-
-    this._provideHandler(pluginId, handlerName);
-
-    return this;
+  addPostEventHook(pluginId, handlerNames, hook, hookId) {
+    return this._addHook(this, this.postEventHooks, pluginId, handlerNames,
+        hook, hookId);
   }
 }
 

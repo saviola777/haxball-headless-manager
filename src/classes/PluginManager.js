@@ -1234,10 +1234,10 @@ class PluginManager {
    */
   triggerLocalEvent(plugin, eventHandlerName, ...args) {
     const eventHandlerObject = plugin.getEventHandlerObject(eventHandlerName);
-    let metadata = new EventHandlerExecutionMetadata(eventHandlerName);
+    let metadata = new EventHandlerExecutionMetadata(eventHandlerName, ...args);
 
     if (eventHandlerObject !== undefined) {
-      metadata = eventHandlerObject.execute(...args);
+      metadata = eventHandlerObject.execute(metadata, ...args);
     }
 
     this.triggerHhmEvent(HHM.events.LOCAL_EVENT, { plugin,

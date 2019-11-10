@@ -33,6 +33,7 @@ module.exports.createRoom = function(room, pluginManager) {
      * @instance
      * @param {(string|Array.<string>)} handlerNames Event handler names.
      * @param {Function} validator Validator function.
+     * @deprecated Use pre-event handler hooks instead
      * @returns {HhmRoomObject} Fluent interface.
      * @see TrappedRoomManager.addEventStateValidator
      */
@@ -44,21 +45,68 @@ module.exports.createRoom = function(room, pluginManager) {
     },
 
     /**
+     * Add a hook for the given handler name that is executed after each plugin
+     * event handler.
+     *
+     * Hooks are passed the room object and a metadata object.
+     *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @param {string} handlerNames Event handler name.
+     * @returns {HhmRoomObject} Fluent interface.
+     * @param {Function} hook Hook function.
+     * @param {*} hookId Unique hook identifier for the given handler names,
+     *  defaults to the hook code.
+     * @returns {HhmRoomObject} Fluent interface.
+     * @see TrappedRoomManager#addPostEventHandlerHook
+     */
+    addPostEventHandlerHook: function(handlerNames, hook, hookId) {
+      pluginManager.getRoomManager()
+      .addPostEventHandlerHook(this._id, handlerNames, hook, hookId);
+
+      return this;
+    },
+
+    /**
      * Add a hook for the given handler name that is executed after plugin
      * event handlers.
+     *
+     * Hooks are passed the room object and a metadata object.
      *
      * @memberOf HhmRoomObject
      * @instance
      * @param {string} handlerNames Event handler name.
      * @param {Function} hook Hook function.
-     * @param {(string|number)} [id] Hook identifier, use a custom name or leave
-     *  undefined to use the hook function hash.
+     * @param {*} [hookId] Unique hook identifier for the given handler names,
+     *  defaults to the hook code.
      * @returns {HhmRoomObject} Fluent interface.
      * @see TrappedRoomManager#addPostEventHook
      */
-    addPostEventHook: function(handlerNames, hook, id) {
+    addPostEventHook: function(handlerNames, hook, hookId) {
       pluginManager.getRoomManager()
-          .addPostEventHook(this._id, handlerNames, hook, id);
+          .addPostEventHook(this._id, handlerNames, hook, hookId);
+
+      return this;
+    },
+
+    /**
+     * Add a hook for the given handler name that is executed before each plugin
+     * event handler.
+     *
+     * Hooks are passed the room object and a metadata object.
+     *
+     * @memberOf HhmRoomObject
+     * @instance
+     * @param {(string|Array.<string>)} handlerNames Event handler name(s).
+     * @param {Function} hook Hook function.
+     * @param {*} [hookId] Unique hook identifier for the given handler names,
+     *  defaults to the hook code.
+     * @returns {HhmRoomObject} Fluent interface.
+     * @see TrappedRoomManager#addPreEventHandlerHook
+     */
+    addPreEventHandlerHook: function(handlerNames, hook, hookId) {
+      pluginManager.getRoomManager()
+          .addPreEventHandlerHook(this._id, handlerNames, hook, hookId);
 
       return this;
     },
@@ -70,13 +118,16 @@ module.exports.createRoom = function(room, pluginManager) {
      * @memberOf HhmRoomObject
      * @instance
      * @param {(string|Array.<string>)} handlerNames Event handler name(s).
+     *  defaults to the hook code.
      * @param {Function} hook Hook function.
+     * @param {*} [hookId] Unique hook identifier for the given handler names,
+     *  defaults to the hook code.
      * @returns {HhmRoomObject} Fluent interface.
      * @see TrappedRoomManager#addPreEventHook
      */
-    addPreEventHandlerHook: function(handlerNames, hook) {
+    addPreEventHook: function(handlerNames, hook, hookId) {
       pluginManager.getRoomManager()
-          .addPreEventHook(this._id, handlerNames, hook);
+          .addPreEventHook(this._id, handlerNames, hook, hookId);
 
       return this;
     },

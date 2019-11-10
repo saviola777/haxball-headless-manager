@@ -73,31 +73,12 @@ Event handlers can be defined as usual, using e.g.
 room.onPlayerChat = (player, message) => { /* … */ }
 ```
 
-But for convenience it is also possible to use arrays (or objects) of handlers
-if you need several handlers for an event in your plugin (execution in order of
-definition):
-
-```javascript
-room.onPlayerChat = [
-    (player, message) => { /* handler #1 */ },
-    (player, message) => { /* handler #2 */ },
-];
-
-// or as an object, property names can be chosen freely
-room.onPlayerChat = {
-    handler1: (player, message) => { /* … */ },
-    handler2: (player, message) => { /* … */ },
-};
-```
-
-This also works recursively for nested arrays / objects.
-
 For available event handlers, refer to
 
 - the [native RoomObject documentation]{@link external:native-api.RoomObject},
 - the documentation of the plugins you are using (see below for core plugins),
-- {@tutorial events} guide
-- and the following section, which will introduce HHM-specific event handlers.
+- the {@tutorial events} guide
+- the following section, which will introduce HHM-specific event handlers.
 
 ## Local events
 
@@ -142,7 +123,7 @@ system.
 
 ### Persistence
 
-To persist data and keep it around after a room is closed and re-opened, the
+To persist data and keep it around after a room is closed and re-opened,
 HHM provides a simple persistence API through the `hhm/persistence` plugin.
 
 To persist data, implement the `onPersist()` event handler, in which you return
@@ -197,7 +178,7 @@ specified), or just `onConfigSet({})` if no parameter name was specified.
 ## Triggering events
 
 To trigger custom or native events you can use the function
-{@link HhmRoomObject#triggerEvent}:
+{@link HhmRoomObject#triggerEvent}, e.g.:
 
 ```javascript
 room.triggerEvent(`onPlayerRole`, playerId, role, added);
