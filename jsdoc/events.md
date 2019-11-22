@@ -23,62 +23,52 @@ handler name, i.e. you trigger an event using its event handler name.
 The event handling loop is defined in {@link TrappedRoomManager#onExecuteEventHandlers}
 and consists of the following steps:
 
-### Pre-event handler hooks
+### Pre-event hooks
 
-First, all registered pre-event handler hooks for all enabled plugins are executed.
-These hooks can return an `Array` which replaces the event arguments or any
-other value which can be taken into account in the associated event state
-validator. Unlike event handlers, pre-event handler hooks are always executed
-regardless of intermediary event state modification.
+First, all registered pre-event hooks for all enabled plugins are executed.
+These hooks can return an `Array` which replaces the event arguments, or any
+other value which can be taken into account in subsequent hooks. Unlike event
+handlers, pre-event hooks are always executed regardless of intermediary event
+state modification.
 
-To add pre-event handler hooks, call {@link HhmRoomObject#addPreEventHandlerHook}
+To add pre-event hooks, call {@link HhmRoomObject#addPreEventHook}
 with the handler name(s) for which you want to register a hook and the hook
-function. Before the event arguments, an object with the properties `room`
-({@link HhmRoomObject}) and `metadata` ({@link EventHandlerExecutionMetadata~Proxy})
-is passed to the hooks. Here's an example for a pre-event handler hook:
+function, plus an optional hook identifier. Before the event arguments, an object
+with the properties `room` ({@link HhmRoomObject}) and `metadata`
+({@link EventHandlerExecutionMetadata~Proxy}) is passed to the hooks. Here's an
+example for a pre-event hook:
 
 ```javascript
-function onPlayerTeamChangePreEventHandlerHook({}, player) {
+function onPlayerTeamChangePreEventHook({}, player) {
   getPlayerById(player.id, {}).team = player.team;
 }
 ```
 
-This function is part of the `sav/players` plugin's layer which removes asynchronity
-from the room API, it essentially sets the player team to the new team right away
-instead of waiting for the player to actually be moved to the team like the
-native API does.
+This function is part of the `sav/players` plugin's layer which removes 
+asynchronity from the room API, it essentially sets the player team to the new
+team right away instead of waiting for the player to actually be moved to the team
+like the native API does.
 
 Since event arguments can be transformed by pre-event handler hooks and there
 is no defined order for the execution of these hooks, try to avoid making
 assumptions on the event arguments and do careful type and value checking where
 applicable while at the same time avoiding unexpected argument transformation.
 
-### Event state validation
+### Pre-event handler hooks
 
-```javascript
-// If no validator was set, all states are considered valid
-if (this.eventStateValidators[handlerName] === undefined) {
-  return true;
-}
+If at least one of the pre-event hooks returned `false`, event execution is
+cancelled and no further processing happens.
 
-// Return true unless at least one validator returns exactly false
-for (let pluginName of
-    Object.getOwnPropertyNames(this.eventStateValidators[handlerName])) {
+Otherwise, the pre-event handler hooks are executed next. The similar name may
+be confusing, but note the small difference here: __handler__. These hooks are
+executed before every single handler, but work very similar to the pre-event
+hooks in most other regards: they can be added using {@link HhmRoomObject#addPreEventHandlerHook}, they can transform arguments (make sure to create new
+object / arrays when transforming arguments, because arguments are reset after
+each event handler is executed), and they receive the same arguments as the
+other hooks. The `metadata` object can be used to access the current event
+handler object.
 
-  for (let validator of this.eventStateValidators[handlerName][pluginName]) {
-    if (validator({ metadata: metadata }, ...args) === false) {
-      return false;
-    }
-  }
-}
-
-return true;
-```
-
-Event state validation is performed as part of the main event handler execution
-loop.
-
-The reason we need event state validation is simple: consider the case when a
+The reason we need pre-event handler hooks is simple: consider the case when a
 user joins the room, and the first `onPlayerJoin` handler decides that the user
 should be kicked. When the second handler is executed, the player is no longer
 in the room (or, worse, still in the room but in the process of being kicked),
@@ -91,12 +81,19 @@ This takes the burden of making sure the room is in the correct state away from
 the plugin authors, but it also means that, depending on the order of execution,
 __certain handlers are not executed when their associated event happens__.
 
-Event state validators can be added using {@link HhmRoomObject#addEventStateValidator}
-where you pass the handler name(s) and hook functions. Here's an example for
-an event state validator implementation:
+In addition to _global_ pre-event handler hooks, which are executed before every
+single event handler for the associated handler names, it is also possible to
+register pre-event handler hooks directly on the handler object, thereby
+allowing us to have finely grained control over event handler execution. Simply
+retrieve the appropriate handler object and call
+`handler.addPreEventHandlerHook(plugin, hook, hookId)` where you pass the room
+object of your plugin as well as the hook function and an optional hook
+identifier.
+
+Here's an example for a pre-event handler hook implementation:
 
 ```javascript
-function onPlayerJoinEventStateValidator({}, player) {
+function onPlayerJoinPreEventHandlerHook({}, player) {
   return player.online === true;
 }
 ```
@@ -104,69 +101,42 @@ function onPlayerJoinEventStateValidator({}, player) {
 This is from the `sav/players` plugin and it uses the custom player property
 `online` (which is set to false when a player leaves) to check if the player
 is still in the room and returns `false` if the player is no longer online.
-The first argument to any event state validator is an object containing (currently)
-only one property `metadata`, which is an instance of {@link EventHandlerExecutionMetadata},
-the rest correspond to the event arguments.
 
 ### Event handler execution
 
-Event handler execution loop:
-
-```javascript
-// Execute event handlers
-if (this.handlerExecutionOrders.has(handlerName)) {
-  for (let pluginId of this.handlerExecutionOrders.get(handlerName)) {
-    // Skip disabled plugins
-    if (!this._isPluginEnabledAndLoaded(pluginId)) {
-      continue;
-    }
-
-    // Abort if event state not valid
-    if (!this._isValidEventState(handlerName, metadata, ...args)) {
-      break;
-    }
-
-    this.executeHandler(this.handlers[pluginId][handlerName], metadata,
-            ...args);
-  }
-}
-```
-
-Event handler execution:
-
-```javascript
-let extraArgsPosition = this.functionReflector
-    .getArgumentInjectionPosition(handler, args);
-
-if (extraArgsPosition >= 0) {
-  args = args.concat(Array(Math.max(0, extraArgsPosition - args.length))
-      .fill(undefined)).concat(metadata.forPlugin(pluginName));
-}
-
-metadata.registerReturnValue(pluginName, handler(...args));
-```
-
-In the event handler execution loop you can see that disabled plugins are
-skipped and the loop is aborted if the event state is no longer valid.
+And event handler is executed after all pre-event hooks and pre-event handler
+hooks and it is only executed if none of those hooks returned `false`.
 
 Before the handler is executed in the function {@link  TrappedRoomManager#_executeHandler},
 the plugin-specific metadata object is injected into the handler arguments if
 needed. This object is an instance of {@link EventHandlerExecutionMetadata~Proxy}
-which gives limited access to the proxied metadata object and allows conventient
+which gives limited access to the proxied metadata object and allows convenient
 plugin-specific metadata storage.
-
 
 ### Post-event handler hooks
 
 Much like the pre-event handler hooks, the post-event handler hooks can be
-registered with {@link HhmRoomObject#addPostEventHook} and will be
-executed after the event handlers with the same arguments `room` and `metadata`.
+registered with {@link HhmRoomObject#addPostEventHandlerHook} (as well as
+directly on the handler object) and will be executed after every event handler
+with the same arguments `room` and `metadata`.
 
-They have a less important role than pre-event handler hooks in that they are
+Post-event handler hooks are only executed if the associated event handler was
+executed.
+
+### Post-event hooks
+
+Much like the pre-event hooks, the post-event hooks can be
+registered with {@link HhmRoomObject#addPostEventHook} and will be
+executed after every event handler with the same arguments `room` and `metadata`.
+
+They have a less important role than pre-event hooks in that they are
 essentially handlers which are executed after the main event handler execution
 loop finishes. They are always executed regardless of event state validation. If
 you want to make sure your handler is executed but do not need it to be executed
 before the event handler execution loop, register it as a post-event handler hook.
+
+If you want to check if any handlers were executed to decide if you hook needs
+to be run, check `metadata.getHandlers().size`.
 
 ## HHM events
 

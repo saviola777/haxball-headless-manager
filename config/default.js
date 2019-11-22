@@ -8,7 +8,6 @@
 
 HHM = typeof HHM === `undefined` ? {} : HHM;
 HHM.config = HHM.config || {};
-hrConfig = typeof hrConfig === `undefined` ? {} : hrConfig;
 
 // Start editing here
 
@@ -25,24 +24,23 @@ hrConfig = typeof hrConfig === `undefined` ? {} : hrConfig;
  * This value is only taken into account if the HHM has not yet been loaded
  * when this config is loaded.
  */
-HHM.config.version = hrConfig.hhmVersion || `0.9.2`;
+HHM.config.version = `1.0.0`;
 
 /**
  * Include your room config here (the object that will be passed to HBInit).
  *
  * If set to false, you will have to call PluginManager#start manually with a
  * room instance to start the plugin system.
- *
- * Please only adjust values on the right side of '||'.
  */
 HHM.config.room = {
-  roomName: hrConfig.roomName || `haxroomie`,
-  playerName : hrConfig.playerName || `host`,
-  maxPlayers: hrConfig.maxPlayers || 16,
-  public : hrConfig.hasOwnProperty('public') ? hrConfig.public : false,
-  password: hrConfig.password,
-  geo: hrConfig.geo || {code: `FI`, lat: 60.192059, lon: 24.945831},
-  token: hrConfig.token || `insert your token here`
+  roomName: `haxroomie`,
+  playerName : `host`,
+  maxPlayers: 16,
+  noPlayer: true,
+  public : false,
+  password: ``,
+  geo: { code: `FI`, lat: 60.192059, lon: 24.945831 },
+  token: `insert your token here`
 };
 
 /**
@@ -60,6 +58,7 @@ HHM.config.postInit = HBInit => {
   var room = HBInit();
 
   room.onRoomLink = () => {
+    // Put your changes here
     room.setDefaultStadium(`Big`);
     room.setScoreLimit(0);
     room.setTimeLimit(7);
@@ -73,15 +72,12 @@ HHM.config.postInit = HBInit => {
  * The properties of this object should be plugin names, the values should be
  * configuration objects or an empty object if you want to use the default
  * configuration.
- *
- * You can use hrConfig.someProperty || `your default value` to support config
- * overrides from haxroomie.
  */
 HHM.config.plugins = {
   'sav/roles': {
     roles: {
-      'host': ``,
-      'admin': hrConfig.adminPassword || 'haxroomie'
+      'host': `hostpass CHANGE ME`,
+      'admin': 'adminpass CHANGE ME'
     },
   },
   'sav/core': {},
@@ -142,7 +138,7 @@ HHM.config.repositories = [
  *
  * One of: trace, debug, info, warn, error, silent
  */
-HHM.config.logLevel = hrConfig.hhmLogLevel || `info`;
+HHM.config.logLevel = `info`;
 
 // Do not edit anything after this
 

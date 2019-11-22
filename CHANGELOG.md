@@ -1,5 +1,21 @@
 # Changelog
 
+## Version 1.0.0
+
+- add support for object handlers
+- rework event handler loop
+- remove event state validators
+- add pre/post-event handler hooks which are executed before and after every
+  single event handler
+- better event execution metadata
+- add support for loading new versions of plugins at runtime
+- small API improvements and refactoring
+
+## Version 0.9.3
+
+- rework repository system
+- add support for local repositories
+
 ## Version 0.9.2
 
 - first release which is deployed on [surge.sh](https://surge.sh)

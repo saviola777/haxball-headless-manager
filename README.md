@@ -4,12 +4,31 @@ Suite of management scripts for headless haxball hosts, including
 [plugins](https://github.com/saviola777/hhm-plugins) with
 dependency management. [Changelog](./CHANGELOG.md). [License](./LICENSE).
 
+# Quick start
+
+Here's how to get started using HHM in a graphical environment:
+
+- copy the [default configuration file](./config/default.js) to your local PC or
+  VPS
+- change the file to suit your needs, most importantly
+    - change room settings in `HHM.config.room`
+    - add initialization code in `HHM.config.postInit`
+    - add custom plugins in `HHM.config.plugins`
+    - change host and admin passwords!
+    - add custom repositories in `HHM.config.repositories`
+- after making your changes, copy the whole file and paste it into the developer
+  console on the [headless host](https://www.haxball.com/headless) page
+
+More details below.
+
+# Overview
+
 Useful links:
 
-- [haxroomie](https://github.com/morko/haxroomie#installation): If you are a
-  user and want to host your room using HHM plugins, check out haxroomie, then
-  come back here once you want to add more repositories / plugins or write
-  your own plugins.
+- [haxroomie](https://github.com/morko/haxroomie#installation): If you have a
+  VPS without a graphical environment or want to load plugins from disk, check
+  out haxroomie, then come back here once you want to add more
+  repositories / plugins or write your own plugins.
 - [hhm-plugins](https://github.com/saviola777/hhm-plugins): Main plugin
   repository. Check it out to see which plugins already exist and how to use
   them.
@@ -30,7 +49,6 @@ configuration.
 This section will show the HHM configuration directives you will be using when
 running [haxroomie](https://github.com/morko/haxroomie), which is what most
 people will want to do.
-
 
 These configuration directives are available in both HHM and haxroomie:
 
@@ -146,8 +164,8 @@ HHM.config.plugins = {
   // […]
   'sav/roles': {
     roles: {
-      'host': `add your password here`,
-      'admin': haxroomie.adminPassword || 'haxroomie'
+      'host': `add your host password here`,
+      'admin': `add your admin password here`
     },
   },
 };
@@ -157,7 +175,7 @@ Then, you have to authenticate for the `host` role in the room using the
 following command:
 
 ```
-!auth host add your password here
+!auth host add your host password here
 ```
 
 Now you can load plugins from configured repositories:

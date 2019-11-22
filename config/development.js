@@ -2,26 +2,26 @@
 
 HHM = typeof HHM === `undefined` ? {} : HHM;
 HHM.config = HHM.config || {};
-hrConfig = typeof hrConfig === `undefined` ? {} : hrConfig;
 
 // Start editing here
 
-HHM.config.version = hrConfig.hhmVersion || `git`;
+HHM.config.version = `git`;
 
 HHM.config.room = {
-  roomName: hrConfig.roomName || `haxroomie`,
-  playerName : hrConfig.playerName || `host`,
-  maxPlayers: hrConfig.maxPlayers || 16,
-  public : hrConfig.hasOwnProperty('public') ? hrConfig.public : false,
-  password: hrConfig.password,
-  geo: hrConfig.geo || {code: `FI`, lat: 60.192059, lon: 24.945831},
-  token: hrConfig.token || "insert your token here"
+  roomName: `haxroomie`,
+  playerName : `host`,
+  maxPlayers: 16,
+  public : false,
+  password: ``,
+  geo: { code: `FI`, lat: 60.192059, lon: 24.945831 },
+  token: `insert your token here`
 };
 
 HHM.config.postInit = HBInit => {
   var room = HBInit();
 
   room.onRoomLink = () => {
+    // Start making changes here
     room.setDefaultStadium(`Big`);
     room.setScoreLimit(0);
     room.setTimeLimit(7);
@@ -31,8 +31,8 @@ HHM.config.postInit = HBInit => {
 HHM.config.plugins = {
   'sav/roles': {
     roles: {
-      'host': `haxroomie`,
-      'admin': hrConfig.adminPassword || `haxroomie`
+      'host': `hostpass CHANGE ME`,
+      'admin': `adminpass CHANGE ME`
     },
   },
   'sav/core': {},

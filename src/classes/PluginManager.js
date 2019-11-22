@@ -552,10 +552,12 @@ class PluginManager {
       }
 
       dependentPlugins = this.disablePlugin(pluginId, true)
-          .filter(id => id != pluginId).reverse();
+          .filter(id => id !== pluginId).reverse();
     }
 
-    this.removePlugin(pluginId);
+    if (!this.removePlugin(pluginId, safe)) {
+      throw new Error(`Failed to remove plugin ${pluginName} before reloading`);
+    }
 
     const newPluginId = await this.addPlugin({ pluginName });
 
@@ -576,17 +578,20 @@ class PluginManager {
    *
    * @function PluginManager#removePlugin
    * @param {number} pluginId ID of the plugin to be removed.
+   * @param {boolean} safe Whether the removal should be done safely, i.e. by
+   *  first disabling the relevant plugin and making sure no other enabled
+   *  plugins depend on it.
    * @returns {boolean} Whether the removal was successful. Removal fails if
    *  the plugin cannot be disabled (i.e. if it depends on itself or other
    *  plugins depend on it). Removal is considered successful if the plugin
    *  with the given ID does not exist.
    */
-  removePlugin(pluginId) {
+  removePlugin(pluginId, safe = true) {
 
     if (!this.hasPlugin(pluginId)) return true;
 
-    if (!this.canPluginBeDisabled(pluginId)
-        || this.disablePlugin(pluginId, false).indexOf(pluginId) === -1) {
+    if (safe && (!this.canPluginBeDisabled(pluginId)
+        || this.disablePlugin(pluginId, false).indexOf(pluginId) === -1)) {
       return false;
     }
 
@@ -622,58 +627,6 @@ class PluginManager {
     }
 
     return true;
-  }
-
-  /**
-   * Loads the plugin for the given name and its dependencies.
-   *
-   * @function PluginManager#addPluginByName
-   * @async
-   * @param {string} pluginName Name of the plugin.
-   * @deprecated Please use #addPlugin instead
-   * @returns {Promise.<number>} Plugin ID if the plugin and all of its
-   *  dependencies have been loaded, -1 otherwise.
-   */
-  async addPluginByName(pluginName) {
-    return this.addPlugin({ pluginName });
-  }
-
-  /**
-   * Loads the plugin and its dependencies from the given code.
-   *
-   * If you specify a plugin name, it can be overwritten from the loaded plugin
-   * code.
-   *
-   * @function PluginManager#addPluginByCode
-   * @async
-   * @param {(Function|string)} pluginCode Plugin code as `Function` or
-   *  `string`.
-   * @param {string} pluginName Name of the plugin.
-   * @deprecated Please use #addPlugin instead
-   * @returns {Promise.<number>} Plugin ID if the plugin and all of its
-   *  dependencies have been loaded, -1 otherwise.
-   */
-  async addPluginByCode(pluginCode, pluginName) {
-    return this.addPlugin({ pluginName, pluginCode });
-  }
-
-  /**
-   * Disables the plugin with the given ID.
-   *
-   * Before calling this, make sure the plugin can be disabled (i.e. all
-   * dependents have been disabled) or set `recursive` to `true`.
-   *
-   * @function PluginManager#disablePluginById
-   * @param {number} pluginId Plugin ID.
-   * @param {boolean} [recursive] Whether to recursively disable plugins which
-   *  depend on the given plugin.
-   * @deprecated Use #disablePlugin instead
-   * @returns {array.<number>} Array of disabled plugin IDs or empty array if
-   *  the plugin could not be disabled or was already disabled.
-   * @see PluginManager#getDependentPlugins
-   */
-  disablePluginById(pluginId, recursive = false) {
-    return this.disablePlugin(pluginId, recursive);
   }
 
   /**
@@ -750,18 +703,6 @@ class PluginManager {
   }
 
   /**
-   * Enables the given plugin and its dependencies.
-   *
-   * @function PluginManager#enablePluginById
-   * @param {number} pluginId Plugin ID.
-   * @deprecated Use #enablePlugin instead
-   * @returns {boolean} `true` if any plugin was enabled, `false` otherwise.
-   */
-  enablePluginById(pluginId) {
-    return this.enablePlugin(pluginId);
-  }
-
-  /**
    * Returns an `Array` of plugins that depend on the plugin with the given ID.
    *
    * @function PluginManager#getDependentPlugins
@@ -801,25 +742,6 @@ class PluginManager {
     });
 
     return [...new Set(dependencies)].reverse();
-  }
-
-  /**
-   * Returns an `Array` of plugins that depend on the plugin with the given ID.
-   *
-   * @function PluginManager#getDependentPluginsById
-   * @param {number} pluginId Plugins depending on this plugin will be returned.
-   * @param {boolean} [recursive] Whether to recursively plugins that indirectly
-   *  depend on the given plugin.
-   * @param {boolean} [includeDisabled] Whether to include disabled dependencies.
-   * @param {Set} [dependents] Used internally to avoid endless recursion.
-   * @deprecated Use #getDependentPlugins instead
-   * @returns {Array.<number>} `Array` of plugin IDs which depend on the given
-   *  `pluginId`.
-   */
-  getDependentPluginsById(pluginId, recursive = true, includeDisabled = false,
-                          dependents = new Set()) {
-    return this.getDependentPlugins(pluginId, recursive, includeDisabled,
-        dependents);
   }
 
   /**
@@ -900,36 +822,6 @@ class PluginManager {
     }
 
     return pluginRoom;
-  }
-
-  /**
-   * Returns the plugin for the given ID or undefined if no such plugin exists.
-   *
-   * @function PluginManager#getPluginById
-   * @param {number} pluginId Plugin ID.
-   * @deprecated use #getPlugin instead
-   * @returns {external:haxball-room-trapper.TrappedRoom} Plugin room proxy.
-   */
-  getPluginById(pluginId) {
-    return this.getPlugin(pluginId);
-  }
-
-  /**
-   * Returns the trapped room for the given plugin.
-   *
-   * @function PluginManager#getPluginByName
-   * @param {string} [pluginName] Name of the plugin or undefined to create new
-   *  plugin.
-   * @param {boolean} [create] `true` if a new plugin should be created if it
-   *  does not exist. If no `pluginName` was given, this parameter is ignored
-   *  and a new plugin is created.
-   * @deprecated use #getPlugin instead
-   * @returns {(external:haxball-room-trapper.TrappedRoom|undefined)} Plugin
-   *  room proxy or undefined if the plugin was not found and `create` is
-   *  `false`.
-   */
-  getPluginByName(pluginName, create = false) {
-    return this.getPlugin(pluginName, create);
   }
 
   /**
@@ -1044,37 +936,6 @@ class PluginManager {
 
     return this.plugins.has(pluginId)
         && this.plugins.get(pluginId)._lifecycle.valid;
-  }
-
-  /**
-   * Returns `true` if a plugin with the given ID exists and is valid, `false`
-   * otherwise.
-   *
-   * A plugin is valid if HBInit() has been called and no error happened during
-   * plugin execution.
-   *
-   * @function PluginManager#hasPluginById
-   * @param {number} pluginId ID of the plugin.
-   * @deprecated use #hasPlugin instead
-   * @returns {boolean} Whether a plugin with the given ID exists and is valid.
-   */
-  hasPluginById(pluginId) {
-    return this.hasPlugin(pluginId);
-  }
-
-  /**
-   * Returns `true` if the plugin with the given name exists and is valid,
-   * `false` otherwise.
-   *
-   * @function PluginManager#hasPluginByName
-   * @param {string} pluginName Name of the plugin.
-   * @deprecated use #hasPlugin instead
-   * @returns {boolean} Whether a plugin with the given name exists and is
-   *  valid.
-   * @see PluginManager#hasPlugin
-   */
-  hasPluginByName(pluginName) {
-    return this.hasPlugin(pluginName);
   }
 
   /**

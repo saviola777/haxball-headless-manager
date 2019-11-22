@@ -4,7 +4,7 @@ To turn a regular headless script into an HHM plugin, nothing has to be changed
 unless the script uses custom intervals to execute logic (these can be turned
 into room event handlers using the `sav/cron` plugin).
 
-The HHM provides a `HBInit()` function which returns a room instance just as you
+HHM provides a `HBInit()` function which returns a room instance just as you
 would expect, parameters to this function are ignored.
 
 ## Plugin specification

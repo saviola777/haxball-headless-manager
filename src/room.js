@@ -25,25 +25,6 @@ module.exports.createRoom = function(room, pluginManager) {
      */
     _pluginManager: pluginManager,
   }, {
-
-    /**
-     * Add an event state validator function for the given handler names.
-     *
-     * @memberOf HhmRoomObject
-     * @instance
-     * @param {(string|Array.<string>)} handlerNames Event handler names.
-     * @param {Function} validator Validator function.
-     * @deprecated Use pre-event handler hooks instead
-     * @returns {HhmRoomObject} Fluent interface.
-     * @see TrappedRoomManager.addEventStateValidator
-     */
-    addEventStateValidator: function(handlerNames, validator) {
-      pluginManager.getRoomManager()
-          .addEventStateValidator(this._id, handlerNames, validator);
-
-      return this;
-    },
-
     /**
      * Add a hook for the given handler name that is executed after each plugin
      * event handler.

@@ -11,9 +11,6 @@ const EventHandlerExecutionMetadata = require(`./EventHandlerExecutionMetadata`)
  * @TODO document where certain events are triggered
  *
  * @class TrappedRoomManager
- * @property {Object.<string, Object.<number, Array.<Function>>>}
- *  eventStateValidators `Array` of event state validators for each plugin and
- *  handler.
  * @property {FunctionReflector} functionReflector `FunctionReflector` used to
  *  analyze event handler functions.
  * @property {Map.<string, Array.<number>>} handlerExecutionOrders `Array` of
@@ -49,13 +46,13 @@ class TrappedRoomManager {
   constructor(room) {
     this._class = `TrappedRoomManager`;
 
-    // TODO remove
-    this.eventStateValidators = {};
     this.functionReflector = new HHM.classes.FunctionReflector(
         Math.floor((Math.random() * 10000) + 1));
 
     this.handlerExecutionOrders = new Map();
     this.handlerNames = new Set();
+
+    this.onGameTickHandlers = new Map();
 
     this.handlers = new Map();
     this.handlersDirty = true;
@@ -192,7 +189,7 @@ class TrappedRoomManager {
 
     const handlerObjectDefaults = {
       data: {},
-      functions: handler,
+      function: handler,
     };
 
     const handlerObjectRequiredElements = {
@@ -236,7 +233,7 @@ class TrappedRoomManager {
 
     handlerObject.metadata = metadata;
 
-    const handlerFunctions = handlerObject.functions;
+    const handlerFunctions = handlerObject.function;
 
     // TODO do we expect a non object handler?
     if (typeof handlerFunctions === `function`) {
@@ -316,6 +313,10 @@ class TrappedRoomManager {
     }
   }
 
+  _executeOnGameTickHandlers() {
+    this.onGameTickHandlers.forEach((handlerFunction) => handlerFunction());
+  }
+
   /**
    * Returns whether the plugin with the given ID is both enabled and loaded.
    *
@@ -329,41 +330,6 @@ class TrappedRoomManager {
   _isPluginEnabledAndLoaded(pluginId) {
     return this.room.getPluginManager().hasPlugin(pluginId)
       && this.room.getPluginManager().getPlugin(pluginId).isEnabled();
-  }
-
-  /**
-   * Checks event state validity.
-   *
-   * An event state is valid unless one of the event state validators returns
-   * `false`, in which case further event handler execution is aborted for the
-   * given event.
-   *
-   * @function TrappedRoomManager#_isValidEventState
-   * @private
-   * @param {string} handlerName Event handler name.
-   * @param {EventHandlerExecutionMetadata} metadata Event metadata.
-   * @param {...*} args Event arguments.
-   * @returns {boolean} `false` if one of the event state validators returned
-   *  `false`, `true` otherwise.
-   */
-  _isValidEventState(handlerName, metadata) {
-    // If no validator was set, all states are considered valid
-    if (this.eventStateValidators[handlerName] === undefined) {
-      return true;
-    }
-
-    // Return true unless at least one validator returns exactly false
-    for (let pluginName of
-        Object.getOwnPropertyNames(this.eventStateValidators[handlerName])) {
-
-      for (let validator of this.eventStateValidators[handlerName][pluginName]) {
-        if (validator({ metadata: metadata }, ...metadata.args) === false) {
-          return false;
-        }
-      }
-    }
-
-    return true;
   }
 
   /**
@@ -417,6 +383,16 @@ class TrappedRoomManager {
     if (!this.properties.has(pluginId)) {
       this.properties.set(pluginId, new Map());
     }
+  }
+
+  _updateOnGameTickHandlers() {
+    this.onGameTickHandlers.clear();
+
+    this.getAllEventHandlerObjects(`onGameTick`).forEach((h, pluginId) => {
+      if (this.room._pluginManager.isPluginEnabled(pluginId)) {
+        this.onGameTickHandlers.set(pluginId, h.function);
+      }
+    });
   }
 
   /**
@@ -820,11 +796,18 @@ class TrappedRoomManager {
    * @param {string} handlerName Event handler name.
    * @param {...*} args Event arguments.
    * @returns {boolean} `false` if one of the event handlers returned
-   *  `false`, `true` otherwise.
+   *  `false`, `true` otherwise. Always `true` for onGameTick events.
    */
   onExecuteEventHandlers(_, handlerName, ...args) {
     if (this.handlersDirty) {
+      this._updateOnGameTickHandlers();
       this.determineExecutionOrders();
+    }
+
+    if (handlerName === `onGameTick`) {
+      this._executeOnGameTickHandlers();
+
+      return true;
     }
 
     const metadata = new EventHandlerExecutionMetadata(handlerName, ...args);
@@ -838,10 +821,10 @@ class TrappedRoomManager {
 
     let preEventReturnValue = metadata.getReturnValue();
 
+    let executedHandlers = new Map();
+
     // Execute event handlers
     if (this.handlerExecutionOrders.has(handlerName) && preEventReturnValue) {
-
-      let executedHandlers = new Map();
 
       for (let pluginId of this.handlerExecutionOrders.get(handlerName)) {
 
@@ -849,6 +832,8 @@ class TrappedRoomManager {
         if (!this._isPluginEnabledAndLoaded(pluginId)) {
           continue;
         }
+
+        const args = metadata.args;
 
         const handlerObject = this.handlers.get(pluginId).get(handlerName);
 
@@ -873,13 +858,16 @@ class TrappedRoomManager {
           this._executeHooks(handlerObject.data[`hhm/core`].postEventHandlerHooks,
               handlerName, metadata);
         }
-      }
 
-      metadata.setHandlers(executedHandlers);
+        // Reset args
+        metadata.args = args;
+      }
     }
 
+    metadata.setHandlers(executedHandlers);
+
     // Execute post-event hooks
-    if (this.postEventHooks.has(handlerName) && preEventReturnValue) {
+    if (this.postEventHooks.has(handlerName)) {
       this._executeHooks(this.postEventHooks, handlerName, metadata);
     }
 
@@ -981,45 +969,6 @@ class TrappedRoomManager {
     this.properties.delete(pluginId);
     this.handlers.delete(pluginId);
     this.handlersDirty = true;
-  }
-
-  /**
-   * Add an event state validator function for the given handler names.
-   *
-   * The validator function should return false if the event state is no longer
-   * valid and further event handlers should not be executed.
-   *
-   * @function TrappedRoomManager#addEventStateValidator
-   * @param {number} pluginId Plugin ID.
-   * @param {string} handlerNames Event handler name(s).
-   * @param {Function} validator Validator function.
-   * @deprecated Use pre-event handler hook instead
-   * @returns {TrappedRoomManager} The trapped room manager, enables method
-   *  chaining.
-   */
-  addEventStateValidator(pluginId, handlerNames, validator) {
-    if (typeof handlerNames === `object` &&
-        typeof handlerNames[Symbol.iterator] === 'function') {
-      for (let handlerName of handlerNames) {
-        this.addEventStateValidator(pluginId, handlerName, validator);
-      }
-
-      return this;
-    }
-
-    let handlerName = String(handlerNames);
-
-    if (this.eventStateValidators[handlerName] === undefined) {
-      this.eventStateValidators[handlerName] = {};
-    }
-
-    if (this.eventStateValidators[handlerName][pluginId] === undefined) {
-      this.eventStateValidators[handlerName][pluginId] = [];
-    }
-
-    this.eventStateValidators[handlerName][pluginId].push(validator);
-
-    return this;
   }
 
   /**
