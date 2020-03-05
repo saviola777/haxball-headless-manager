@@ -95,8 +95,8 @@ const github = {
    * The handler will load the contents of the file "respository.json" in the
    * root of the GitHub repository.
    *
-   * The version parameter will be appended to the repository name. If no
-   * custom repository name is specified, the GitHub repository name is used.
+   * If no custom repository name is specified, the GitHub repository name and
+   * version is used.
    *
    * @function repository.github.getRepositoryInformation
    * @throws {repository.RepositoryTypeError} If a non-github repository is given.
@@ -108,7 +108,7 @@ const github = {
       throw new repositoryClasses.RepositoryTypeError(repository.getType());
     }
 
-    let { "repository": repositoryName, version }
+    let { "repository": repositoryName, version, name }
         = repository.getConfiguration();
 
     const repositoryInformationUrl = `https://cdn.jsdelivr.net/gh/` +
@@ -130,13 +130,8 @@ const github = {
       // No information available for this repository, no action necessary
     }
 
-    if (repositoryInformation.name === undefined) {
-      repositoryInformation.name = repositoryName;
-    }
-
-    repositoryInformation.name += `@${version}`;
-
-    return repositoryInformation;
+    return $.extend({ name: `${repositoryName}@${version}` },
+        repositoryInformation, { name });
   },
 };
 
@@ -198,6 +193,8 @@ const local = {
   /**
    * Returns the local repository information.
    *
+   * If no custom repository name is specified, the path is taken.
+   *
    * @function module:src/repository.local.getRepositoryInformation
    * @async
    * @throws {repository.RepositoryTypeError} If a non-local repository is given.
@@ -209,12 +206,13 @@ const local = {
       throw new repositoryClasses.RepositoryTypeError(repository.getType());
     }
 
-    let { name, plugins, repositoryInformation }
+    let { name, path, plugins, repositoryInformation }
       = repository.getConfiguration();
 
     let pluginNames = Object.getOwnPropertyNames(plugins);
 
-    return $.extend({}, { name, plugins: pluginNames }, repositoryInformation);
+    return $.extend({}, { name: path, plugins: pluginNames },
+        repositoryInformation, { name });
   },
 };
 
@@ -280,6 +278,8 @@ const plain = {
   /**
    * Loads the given plugin from the given plain repository.
    *
+   * If no custom repository name is specified, the URL is taken.
+   *
    * @function module:src/repository.plain.getPluginSource
    * @async
    * @param {repository.Repository} repository Repository object.
@@ -293,7 +293,7 @@ const plain = {
       throw new repositoryClasses.RepositoryTypeError(repository.getType());
     }
 
-    let { url } = repository.getConfiguration();
+    let { name, url } = repository.getConfiguration();
 
     if (!url.endsWith(`/`)) url += `/`;
 

@@ -13,12 +13,16 @@
  * @property {Map.<string, *>} data Additional custom event handling
  *  metadata.
  *
+ *  TODO document all properties, remove getters in favor of get xy() where
+ *   necessary or direct access otherwise
+ *
  * @class EventHandlerExecutionMetadata
  */
 class EventHandlerExecutionMetadata {
   constructor(handlerName, ...args) {
     this._class = `EventHandlerExecutionMetadata`;
     this.returnValue = true;
+    this.mostRecentReturnValue = undefined;
     this.handlerName = handlerName;
     this.handlerReturnValues = new Map();
     this.handlerPlugins = [];
@@ -73,19 +77,6 @@ class EventHandlerExecutionMetadata {
   }
 
   /**
-   * Returns the current event arguments.
-   *
-   * Arguments can be transformed by event handlers and this function will
-   * reflect these changes.
-   *
-   * @function EventHandlerExecutionMetadata#getArgs
-   * @returns {(undefined|Array.<*>)} Array of all event arguments.
-   */
-  getArgs() {
-    return this.args;
-  }
-
-  /**
    * Returns the current event handler objects.
    *
    * For pre-event hooks, this contains all handlers that will be executed.
@@ -98,6 +89,20 @@ class EventHandlerExecutionMetadata {
    */
   getHandlers() {
     return this.handlers;
+  }
+
+  /**
+   * Returns the most recently registered return value.
+   *
+   * @function EventHandlerExecutionMetadata#getMostRecentReturnValue
+   * @param {string} [pluginName] Name of the plugin for which you want to
+   *  retrieve the registered return values.
+   * @param {*} [id] ID of the handler or hook.
+   * @returns {*} Return value of the most recently executed handler or
+   *  undefined if no return values have been registered yet.
+   */
+  getMostRecentReturnValue() {
+    return this.mostRecentReturnValue;
   }
 
   /**
@@ -143,6 +148,7 @@ class EventHandlerExecutionMetadata {
     this.args = Array.isArray(returnValue) ? returnValue : this.args;
 
     this.returnValue = returnValue !== false && this.returnValue;
+    this.mostRecentReturnValue = returnValue;
 
     return this;
   }
@@ -204,7 +210,7 @@ class Proxy {
    * @function EventHandlerExecutionMetadata~Proxy#getArgs
    * @see EventHandlerExecutionMetadata#getArgs
    */
-  getArgs() {
+  get args() {
     return this.metadata.args;
   }
 

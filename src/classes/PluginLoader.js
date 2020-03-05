@@ -13,11 +13,9 @@ const hashSeed = 14868;
  */
 class PluginLoader {
 
-  constructor(room, initialRepositories) {
+  constructor(pluginManager) {
     this._class = `PluginLoader`;
-    this.room = room;
-
-    this.initializeRepositories(initialRepositories);
+    this.pluginManager = pluginManager;
   }
 
   /**
@@ -60,11 +58,11 @@ class PluginLoader {
         ? pluginCode.toString() : pluginCode;
     pluginRoom._sourceHash = hashFunction(pluginRoom._source, hashSeed);
 
-    if (!this.room._pluginManager.hasPlugin(pluginRoom._id)) {
+    if (!this.pluginManager.hasPlugin(pluginRoom._id)) {
       HHM.log.error(
           `Invalid plugin ${pluginRoom.getName()}, either an error happened ` +
           `during plugin execution or HBInit() was not called`);
-      this.room._pluginManager.removePlugin(pluginRoom._id);
+      this.pluginManager.removePlugin(pluginRoom._id);
     }
   }
 
@@ -171,22 +169,22 @@ class PluginLoader {
    * @async
    * @param {string} [pluginName] Plugin name.
    * @param {(string|Function)} [pluginCode] Plugin code as string or function.
-   * @param {string} [pluginUrl] URL to the raw plugin source (CORS headers
-   *  required).
+   * @param {object} [pluginConfig] Plugin configuration.
    * @returns {Promise.<number>} the ID of the plugin or -1 if it couldn't be
    *  #loaded.
    */
-  async tryToLoadPlugin({ pluginName, pluginCode } = {}) {
+  async tryToLoadPlugin({ pluginName, pluginCode,
+                          pluginConfig } = {}) {
     let pluginId = -1;
 
     if (pluginCode !== undefined) {
       pluginId = this._tryToLoadPluginByCode(pluginCode, pluginName);
     } else if (pluginName !== undefined) {
-      pluginId = await this._tryToLoadPluginByName(pluginName);
+      pluginId = await this._tryToLoadPluginByName(pluginName, pluginConfig);
     }
 
     if (pluginId !== -1 ) {
-      const pluginRoom = this.room._pluginManager.getPlugin(pluginId);
+      const pluginRoom = this.pluginManager.getPlugin(pluginId);
 
       HHM.log.info(`Plugin ${pluginRoom.getName()} loaded from `
           + pluginRoom._loadedFrom.getName());
@@ -203,16 +201,19 @@ class PluginLoader {
    * @param {(string|Function)} pluginCode Plugin code as `string` or `Function`.
    * @param {string} [pluginName] Optional default plugin name, used only if the
    *  plugin code does not set a name.
+   * @param {object} [pluginConfig] Plugin configuration.
    * @returns {number} the ID of the plugin or -1 if it couldn't be loaded.
    * @see PluginLoader#_executePlugin
    */
-  _tryToLoadPluginByCode(pluginCode, pluginName) {
-    const pluginRoom = this.room.getPlugin(pluginName, true);
+  _tryToLoadPluginByCode(pluginCode, pluginName,
+                         pluginConfig = {}) {
+    const pluginRoom = this.pluginManager.getPlugin(pluginName, true);
     this._executePlugin(pluginCode, pluginRoom);
 
     pluginRoom._loadedFrom = { getName: () => `code`};
 
-    return this.room.hasPlugin(pluginRoom.getName()) ? pluginRoom._id : -1;
+    return this.pluginManager.hasPlugin(pluginRoom.getName())
+        ? pluginRoom._id : -1;
   }
 
   /**
@@ -222,23 +223,49 @@ class PluginLoader {
    * @async
    * @private
    * @param {string} pluginName Name of the plugin to be loaded.
-   * @returns {Promise.<number>} The ID of the plugin or -1 if it couldn't be loaded.
+   * @param {object} [pluginConfig] Plugin configuration.
+   * @returns {Promise.<number>} The ID of the plugin or -1 if it couldn't be
+   *  loaded.
    */
-  async _tryToLoadPluginByName(pluginName) {
+  async _tryToLoadPluginByName(pluginName, pluginConfig = {}) {
 
-    const repositoryCandidates = [];
-    const otherRepositories = [];
+    let repositoryCandidates = [];
+    let otherRepositories = [];
+
+    if (pluginConfig.repository !== undefined) {
+      for (let repository of this.repositories) {
+        if (pluginConfig.repository === repository.getName()) {
+          repositoryCandidates.push(repository);
+          break;
+        }
+      }
+    }
 
     // Find repositories which claim they contain the plugin we're looking for
     for (let repository of this.repositories) {
       const repositoryInfo = repository.getRepositoryInformation();
 
-      if (repositoryInfo.plugins !== undefined
-          && repositoryInfo.plugins.indexOf(pluginName) !== -1) {
+      if (pluginConfig.repository !== undefined) {
+        if (pluginConfig.repository === repository.getName()) {
+          repositoryCandidates = [repository];
+          break;
+        }
+      }
+      else if (repositoryInfo.plugins !== undefined
+          && repositoryInfo.plugins.includes(pluginName)) {
         repositoryCandidates.push(repository);
       } else {
         otherRepositories.push(repository)
       }
+    }
+
+    if (pluginConfig.repository !== undefined) {
+      if (repositoryCandidates.length === 0) {
+        HHM.log.warn(`Required repository ${pluginConfig.repository} for `
+            + `plugin ${pluginName} not found`);
+      }
+
+      otherRepositories = [];
     }
 
     for (let repository of [...repositoryCandidates, ...otherRepositories]) {
@@ -256,8 +283,7 @@ class PluginLoader {
           await this._tryToLoadPluginByCode(repositoryResult, pluginName);
 
       if (pluginId !== -1) {
-        this.room.getPluginManager()
-            .getPlugin(pluginId)._loadedFrom = repository;
+        this.pluginManager.getPlugin(pluginId)._loadedFrom = repository;
 
         return pluginId;
       }

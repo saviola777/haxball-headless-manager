@@ -659,7 +659,14 @@ provides a simple way to register and display help texts.
 Here's an example for the `!auth` command:
 
 ```javascript
-room.getPlugin(`sav/help`).registerHelp(`auth`, ` ROLE PASSWORD`);
+room.onCommand_auth = {
+  function: () => { /* auth handler code */ },
+  data: {
+    'sav/help': {
+      text: ` ROLE PASSWORD`,
+    }
+  }
+}
 ```
 
 Now, when a user types `!help auth` they (and only they, nobody else in the
@@ -670,7 +677,7 @@ Usage: !auth ROLE PASSWORD
 ```
 
 So basically, the text you provided will be appended to the command. Nothing too
-fancy, but it's a more convenient way of writing
+fancy, but it's a more integrated way of writing
 
 ```javascript
 room.onCommand_help_auth = (player) => room.sendChat(`Usage: !auth ROLE PASSWORD`, player.id);

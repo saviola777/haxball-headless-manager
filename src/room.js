@@ -384,7 +384,7 @@ module.exports.createRoom = function(room, pluginManager) {
      */
     isEnabled: function() {
       return this.isLoaded()
-          && pluginManager.pluginsDisabled.indexOf(this._id) === -1;
+          && !pluginManager.pluginsDisabled.includes(this._id);
     },
 
     /**

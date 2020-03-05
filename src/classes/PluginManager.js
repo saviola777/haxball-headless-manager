@@ -31,6 +31,11 @@ class PluginManager {
     this.plugins = new Map();
     this.pluginsDisabled = [];
     this.pluginIds = new Map();
+
+    this.preUserPlugins = [{ pluginName: `hhm/core` },
+      { pluginName: `hhm/persistence` }];
+
+    this.pluginLoader = new PluginLoader(this);
   }
 
   /**
@@ -75,33 +80,41 @@ class PluginManager {
    *  you want to load a plugin by code.
    * @param {(Function|string)} [pluginCode] Plugin code as `Function` or
    *  `string`.
-   * @param {Array.<number>} [loadStack] `Array` of loaded plugin IDs in load
-   *  order. Used internally during recursion.
+   * @param {Object} [pluginConfig] Optional plugin configuration, user config
+   *  takes precedence.
+   * @param {Array.<(number|boolean)>} [loadStack] `Array` of loaded plugin IDs
+   *  in load order. Used internally during recursion.
    * @returns {Promise<(number|Array.<number>)>} When called without a
-   *  `loadStack`, it will return the plugin ID or -1 if the plugin failed to
-   *  load, otherwise it will return the updated `loadStack`.
+   *  `loadStack`, it will return the plugin ID or -1 if the plugin (or one of
+   *  its dependencies) failed to load, otherwise it will return the updated
+   *  `loadStack`.
    */
-  async addPlugin({ pluginName, pluginCode } = {}, loadStack) {
+  async addPlugin({ pluginName, pluginCode, pluginConfig } = {}, loadStack) {
+
+    if (HHM.deferreds.managerStarted.state === `pending`) {
+      this.preUserPlugins.push({ pluginName, pluginCode, pluginConfig });
+    }
+
     const initializePlugins = loadStack === undefined;
     loadStack = loadStack || [];
 
-    if (pluginName !== undefined && this.room.hasPlugin(pluginName)) {
+    if (pluginName !== undefined && this.hasPlugin(pluginName)) {
       // Avoid loading plugins twice
         return loadStack || this.getPluginId(pluginName);
     }
 
     const pluginId = await this.pluginLoader.tryToLoadPlugin(
-        { pluginName, pluginCode });
+        { pluginName, pluginCode, pluginConfig });
 
     loadStack = await this._checkPluginAndLoadDependencies(pluginId, loadStack);
 
-    const success = loadStack.indexOf(false) === -1;
+    const success = !loadStack.includes(false);
 
     if (success) {
       pluginName = this.getPluginName(pluginId);
 
       // Merge user config
-      this._mergeConfig(pluginName,
+      this._mergeConfig(pluginName, (pluginConfig || {}),
           (HHM.config.plugins || {})[pluginName]);
 
       if (initializePlugins) {
@@ -125,8 +138,8 @@ class PluginManager {
    * @async
    * @private
    * @param {number} pluginId ID of the plugin.
-   * @param {Array.<number>} loadStack `Array` of loaded plugin IDs
-   * @returns {Promise.<Array.<number>>} Updated `loadStack` `Array`,
+   * @param {Array.<(number|boolean)>} loadStack `Array` of loaded plugin IDs
+   * @returns {Promise.<Array.<(number|boolean)>>} Updated `loadStack` `Array`,
    *  boolean false indicates an error during plugin load, meaning all loaded
    *  plugins will be removed.
    */
@@ -160,7 +173,7 @@ class PluginManager {
 
       loadStack = await this.addPlugin({ pluginName: dependency }, loadStack);
 
-      dependencySuccess = loadStack.indexOf(false) === -1
+      dependencySuccess = !loadStack.includes(false)
           && this._checkPluginsCompatible();
 
       if (!dependencySuccess) {
@@ -171,7 +184,7 @@ class PluginManager {
     // Remove plugin and its dependencies
     if (!dependencySuccess) {
       for (let dependency of pluginSpec.dependencies) {
-        if (dependenciesAlreadyLoaded.indexOf(dependency) === -1) {
+        if (!dependenciesAlreadyLoaded.includes(dependency)) {
           this.removePlugin(this.getPluginId(dependency));
         }
       }
@@ -312,7 +325,7 @@ class PluginManager {
 
       let dependencyId = this.getPluginId(dependency);
 
-      if (enabledPlugins.indexOf(dependencyId) !== -1) {
+      if (enabledPlugins.includes(dependencyId)) {
         continue;
       }
 
@@ -328,6 +341,8 @@ class PluginManager {
       this.triggerLocalEvent(plugin, `onEnable`);
 
       this.pluginsDisabled.splice(pluginIndex, 1);
+
+      this.room._trappedRoomManager.handlersDirty = true;
 
       this.triggerHhmEvent(HHM.events.PLUGIN_ENABLED, {
         plugin: this.getPlugin(pluginId),
@@ -391,7 +406,7 @@ class PluginManager {
 
     const onRoomLinkExecutionOrder = this.room._trappedRoomManager
         .determineExecutionOrder(loadStack, `onRoomLink`)
-        .filter((id) => loadStack.indexOf(id) !== -1);
+        .filter((id) => loadStack.includes(id));
 
     HHM.log.info(`Loading the following plugins:`);
     HHM.log.info(onRoomLinkExecutionOrder.map(
@@ -409,6 +424,8 @@ class PluginManager {
       plugin._lifecycle.loaded = true;
 
       HHM.log.info(`Plugin loaded successfully: ${plugin._name}`);
+
+      this.room._trappedRoomManager.handlersDirty = true;
 
       this.triggerHhmEvent(HHM.events.PLUGIN_LOADED, {
         plugin: plugin,
@@ -454,6 +471,30 @@ class PluginManager {
   }
 
   /**
+   * Loads the plugins which have to be loaded before user plugins.
+   *
+   * All plugins added using PluginManager#addPlugin() before the
+   * PluginManager#start() function was called will be loaded here.
+   *
+   * @function PluginManager#_loadPreUserPlugins
+   * @async
+   * @private
+   * @returns {Promise.<boolean>} Whether loading the pre-user plugins was
+   *  successful.
+   */
+  async _loadPreUserPlugins() {
+    for (let { pluginName, pluginCode, pluginConfig } of this.preUserPlugins) {
+      const pluginId = await this.addPlugin(
+          { pluginName, pluginCode, pluginConfig });
+
+      if (pluginId === -1) {
+        HHM.log.warn(`Unable to load pre-user plugin: `
+            + (pluginName || pluginCode));
+      }
+    }
+  }
+
+  /**
    * Loads the plugins defined in the user config.
    *
    * @function PluginManager#_loadUserPlugins
@@ -464,7 +505,8 @@ class PluginManager {
    */
   async _loadUserPlugins() {
     for (let pluginName of Object.getOwnPropertyNames(HHM.config.plugins || {})) {
-      await this.addPlugin({ pluginName });
+      await this.addPlugin({ pluginName,
+        pluginConfig: HHM.config.plugins[pluginName] });
 
       if (!this.room.hasPlugin(pluginName)) {
         HHM.log.warn(`Unable to load user plugin: ${pluginName}`);
@@ -473,19 +515,21 @@ class PluginManager {
   }
 
   /**
-   * Merges the given configuration into the configuration for the given plugin.
+   * Merges the given configurations into the configuration for the given plugin.
    *
    * @function PluginManager#_mergeConfig
    * @private
    * @param {string} pluginName Name of the plugin.
-   * @param {Object.<string, *>} config Plugin configuration to be merged in.
+   * @param {Object.<string, *>} configs Plugin configurations to be merged in.
    */
-  _mergeConfig(pluginName, config) {
-    if (!this.room.hasPlugin(pluginName) || config === undefined) {
+  _mergeConfig(pluginName, ...configs) {
+    if (!this.hasPlugin(pluginName) || configs.length === 0) {
       return;
     }
 
-    $.extend(this.room.getPlugin(pluginName).getConfig(), config);
+    $.extend(this.getPlugin(pluginName).getConfig(), ...configs);
+
+    // TODO trigger event to be able to monitor config changes during boot?
   }
 
   /**
@@ -591,7 +635,7 @@ class PluginManager {
     if (!this.hasPlugin(pluginId)) return true;
 
     if (safe && (!this.canPluginBeDisabled(pluginId)
-        || this.disablePlugin(pluginId, false).indexOf(pluginId) === -1)) {
+        || !this.disablePlugin(pluginId, false).includes(pluginId))) {
       return false;
     }
 
@@ -602,6 +646,8 @@ class PluginManager {
     this.pluginsDisabled.splice(
         this.pluginsDisabled.indexOf(pluginId), 1);
     this.room._trappedRoomManager.removePluginHandlersAndProperties(pluginId);
+
+    this.room._trappedRoomManager.handlersDirty = true;
 
     this.triggerHhmEvent(HHM.events.PLUGIN_REMOVED, {
       plugin: pluginRoom,
@@ -652,7 +698,7 @@ class PluginManager {
 
     // Already disabled or can't be disabled
     if (!this.isPluginEnabled(pluginId)
-        || pluginIdStack.indexOf(pluginId) !== -1
+        || pluginIdStack.includes(pluginId)
         || !this.canPluginBeDisabled(pluginId)) {
       return disabledPlugins;
     }
@@ -681,6 +727,8 @@ class PluginManager {
 
     disabledPlugins.push(pluginId);
     this.pluginsDisabled.push(pluginId);
+
+    this.room._trappedRoomManager.handlersDirty = true;
 
     this.triggerHhmEvent(HHM.events.PLUGIN_DISABLED, {
       plugin: this.getPlugin(pluginId),
@@ -969,7 +1017,7 @@ class PluginManager {
 
     const dependentPlugins = this.getDependentPlugins(pluginId, false);
 
-    return !(dependentPlugins.indexOf(pluginId) !== -1
+    return !(dependentPlugins.includes(pluginId)
         || dependentPlugins.some((id) => !this.canPluginBeDisabled(id)));
   }
 
@@ -1074,7 +1122,7 @@ class PluginManager {
    * @param {string} [eventName] Name of the event.
    * @param {Object} [args] Event arguments.
    */
-  triggerHhmEvent(eventName = HHM.events.OTHER, args) {
+  triggerHhmEvent(eventName, args = {}) {
     $.extend(args, { eventName });
     this.triggerEvent(`onHhm_${eventName}`, args);
     this.triggerEvent(`onHhm`, args);
@@ -1132,6 +1180,7 @@ class PluginManager {
     // No room assumes there was no room config, so we wait for the next call
     // to start() and return the room afterwards
     if (room === undefined) {
+      // TODO log
       await HHM.deferreds.managerStarted.promise();
       return this.room;
     }
@@ -1142,35 +1191,29 @@ class PluginManager {
 
     this._initializeCoreEventHandlers();
 
-    this.pluginLoader = new PluginLoader(this.room,
+    this.pluginLoader.initializeRepositories(
         await this._createInitialRepositories(HHM.config.repositories || []));
 
     HHM.log.info(`Waiting for room link`);
 
     await HHM.deferreds.roomLink.promise();
 
-    await this.addPlugin({ pluginName: `hhm/core` }) >= 0 ||
-        (() => { throw new Error(
-            `Error during HHM start: unable to load hhm/core plugin`); })();
+    await this._loadPreUserPlugins();
 
-    if (typeof Storage !== `undefined`) {
-      HHM.storage = HHM.storage || require(`../storage`);
+    HHM.log.info(`Initial pre-user plugins loaded and configured`);
 
-      await this.addPlugin({ pluginName: `hhm/persistence` }) >= 0 ||
-          (() => { throw new Error(`Error during HHM start: unable to load `
-            + `hhm/persistence plugin`); })();
-    } else {
-      HHM.log.warn(`No support for localStorage, persistence is disabled`);
-    }
+    this.triggerHhmEvent(HHM.events.PRE_USER_PLUGINS_LOADED);
 
     await this._loadUserPlugins();
-
-    HHM.log.info(`Initial user plugins loaded and configured`);
 
     await this._postInit() || (() => {
       throw new Error(`Error during HHM start, _postInit failed`); })();
 
+    HHM.log.info(`User plugins loaded and configured`);
+
     HHM.deferreds.managerStarted.resolve();
+
+    this.triggerHhmEvent(HHM.events.USER_PLUGINS_LOADED);
 
     return room;
   }

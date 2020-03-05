@@ -41,7 +41,7 @@ class Repository {
 
     this._validateConfiguration();
 
-    // Turn into map
+    // TODO Turn into map
     this.pluginSources = {};
 
     this.initializationDeferred = new $.Deferred();
@@ -49,7 +49,7 @@ class Repository {
         .then((repositoryInformation) => {
 
       this.repositoryInformation = $.extend(
-          { name: `${handler.type}:${hash(new Date().toString())}` },
+          { name: stringify(this.userRepositoryConfig).substring(0, 200) },
           repositoryInformation);
 
       // Merge in repository configuration
@@ -57,7 +57,7 @@ class Repository {
         $.extend(this.repositoryConfig, this.repositoryInformation.config);
       }
 
-      this.configHash = hash(stringify(this.repositoryConfig));
+      this.configHash = hash(stringify(this.repositoryConfig), seed);
 
       this.initializationDeferred.resolve(this);
     });
@@ -78,7 +78,6 @@ class Repository {
     await $.ajax({
       cache: false,
       crossDomain: true,
-      //dataType: `text`,
       url: url,
       success: (result) => {
         data = result;
@@ -184,8 +183,7 @@ class Repository {
    *   {@link repository.RepositoryTypeHandler.getRepositoryInformation}.</li>
    *   <li>Repository type handler can generate a name based on the repository
    *   configuration if the user has not specified a name.</li>
-   *   <li>The repository type followed by a colon and a hash of the current
-   *   timestamp at repository creation.</li>
+   *   <li>JSON string of the repository configuration object.</li>
    * </ol>
    *
    * @function repository.Repository#getName
@@ -244,6 +242,20 @@ class Repository {
   }
 
   /**
+   * Returns the repository type.
+   *
+   * This is a string representing the type of the repository, e.g. github or
+   * plain.
+   *
+   * @function repository.Repository#getType
+   * @returns {string} Repository type.
+   * @see repository.RepositoryFactory#createRepository
+   */
+  getType() {
+    return this.type;
+  }
+
+  /**
    * Returns the user repository configuration.
    *
    * This is the configuration that was initially passed by the user to create
@@ -252,13 +264,6 @@ class Repository {
    * @function repository.Repository#getUserConfiguration
    * @returns {object.<*>} Repository configuration object.
    * @see repository.RepositoryFactory#createRepository
-   */
-  getType() {
-    return this.type;
-  }
-
-  /**
-   * TODO documentation
    */
   getUserConfiguration() {
     return this.userRepositoryConfig;
@@ -343,7 +348,7 @@ class RepositoryFactory {
     }
 
     // Check if user repository Config is known
-    const userRepositoryConfigHash = hash(stringify(userRepositoryConfig));
+    const userRepositoryConfigHash = hash(stringify(userRepositoryConfig), seed);
 
     if (this.userRepositoryConfigs[userRepositoryConfigHash] !== undefined) {
       return this.repositories[this.userRepositoryConfigs[userRepositoryConfigHash]];

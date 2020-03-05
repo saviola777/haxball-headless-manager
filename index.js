@@ -5,6 +5,10 @@ global.$ = global.jQuery =
 
 require(`./src/namespace`).populate();
 
+if (typeof Storage !== `undefined`) {
+  HHM.storage = HHM.storage || require(`./src/storage`);
+}
+
 // Create plugin manager
 HHM.manager = new HHM.classes.PluginManager();
 

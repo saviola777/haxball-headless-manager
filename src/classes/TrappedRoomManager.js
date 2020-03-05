@@ -193,8 +193,12 @@ class TrappedRoomManager {
     };
 
     const handlerObjectRequiredElements = {
-      execute: (metadata, ...args) => this.executeHandler(handlerObjectDefaults,
-            new EventHandlerExecutionMetadata(handlerName, ...args)),
+      execute: (metadata, ...args) => {
+        metadata = metadata || new EventHandlerExecutionMetadata(handlerName,
+            ...args);
+
+        return this.executeHandler(handlerObjectDefaults, metadata)
+      },
       meta: {
         name: handlerName,
         plugin: this.room.getPlugin(pluginId),
@@ -206,14 +210,19 @@ class TrappedRoomManager {
           postEventHandlerHooks: new Map(),
         }
       },
-      addPreEventHandlerHook: (plugin, hook, hookId) => {
+      addPreEventHandlerHook: function (plugin, hook, hookId) {
         return that._addHook(this, this.data[`hhm/core`].preEventHandlerHooks,
             plugin.id, handlerName, hook, hookId);
       },
-      addPostEventHandlerHook: (plugin, hook, hookId) => {
+      addPostEventHandlerHook: function (plugin, hook, hookId) {
         return that._addHook(this, this.data[`hhm/core`].postEventHandlerHooks,
             plugin.id, handlerName, hook, hookId);
       },
+      getData: function (pluginName, parameterName, defaultValue) {
+        let result = (this.data[pluginName] || {})[parameterName];
+
+        return result === undefined ? defaultValue : result;
+      }
     };
 
     return merge(handlerObjectDefaults, additionalObjectDefaults,
@@ -233,15 +242,15 @@ class TrappedRoomManager {
 
     handlerObject.metadata = metadata;
 
-    const handlerFunctions = handlerObject.function;
+    const handlerFunction = handlerObject.function;
 
     // TODO do we expect a non object handler?
-    if (typeof handlerFunctions === `function`) {
-      this._executeHandlerFunction(handlerFunctions, handlerObject, metadata);
+    if (typeof handlerFunction === `function`) {
+      this._executeHandlerFunction(handlerFunction, handlerObject, metadata);
     }
      else {
       // TODO support string handlers?
-      HHM.log.warn(`Invalid handler type: ${typeof handlerFunctions}`);
+      HHM.log.warn(`Invalid handler function type: ${typeof handlerFunction}`);
     }
 
     return metadata;
@@ -253,7 +262,6 @@ class TrappedRoomManager {
    * @param {Function} handlerFunction The handler function.
    * @param {object.<*>} handlerObject Handler object.
    * @param {EventHandlerExecutionMetadata} metadata Event metadata.
-   * @param {...*} args Event arguments.
    */
   _executeHandlerFunction(handlerFunction, handlerObject, metadata) {
 
@@ -276,6 +284,7 @@ class TrappedRoomManager {
       HHM.log.error(`Error during execution of handler ` +
           `${metadata.handlerName} for plugin ${pluginName}`);
       HHM.log.error(e);
+      metadata.registerReturnValue(pluginName, e);
     }
   }
 
@@ -427,7 +436,7 @@ class TrappedRoomManager {
 
       // Insert all plugins without execution order dependencies at the end
       for (let pluginId of pluginIds) {
-        if (executionOrder.indexOf(pluginId) === -1) {
+        if (!executionOrder.includes(pluginId)) {
           executionOrder.push(pluginId);
         }
       }
@@ -833,7 +842,7 @@ class TrappedRoomManager {
           continue;
         }
 
-        const args = metadata.args;
+        const argsOld = metadata.args;
 
         const handlerObject = this.handlers.get(pluginId).get(handlerName);
 
@@ -860,7 +869,7 @@ class TrappedRoomManager {
         }
 
         // Reset args
-        metadata.args = args;
+        metadata.args = argsOld;
       }
     }
 
@@ -905,23 +914,59 @@ class TrappedRoomManager {
    * @function TrappedRoomManager#onPropertySet
    * @param {*} _ Unused.
    * @param {string} propertyName Property name.
-   * @param {*} value New value for the property.
+   * @param {*} propertyValue New value for the property.
    * @param {number} pluginId Plugin ID.
    */
-  onPropertySet(_, propertyName, value, pluginId) {
+  onPropertySet(_, propertyName, propertyValue, pluginId) {
     this._providePropertyObjectForIdentifier(pluginId);
 
+    const plugin = this.room._pluginManager.getPlugin(pluginId);
     const pluginProperties = this.properties.get(pluginId);
 
-    let valueOld = pluginProperties.get(propertyName);
-    pluginProperties.set(propertyName, value);
+    let propertyValueOld = pluginProperties.get(propertyName);
+    pluginProperties.set(propertyName, propertyValue);
 
     this.room._pluginManager.triggerHhmEvent(HHM.events.PROPERTY_SET, {
-      plugin: this.room._pluginManager.getPlugin(pluginId),
-      propertyName: propertyName,
-      propertyValue: value,
-      propertyValueOld: valueOld,
+      plugin,
+      propertyName,
+      propertyValue,
+      propertyValueOld,
     });
+
+    // Register plugin name after setting the plugin specification
+    if (propertyName === `pluginSpec`) {
+
+      // If pluginSpec is no object, use the value as plugin name
+      // TODO document behavior
+      if (typeof propertyValue !== `object`) {
+        plugin.pluginSpec = { name: propertyValue };
+        return;
+      }
+
+      if (propertyValue.hasOwnProperty(`name`)
+          && propertyValue.name !== plugin._name) {
+
+        plugin._name = propertyValue.name;
+
+      } else if (plugin._name !== plugin._id) {
+        propertyValue.name = plugin._name;
+      }
+
+      plugin.setConfig();
+
+      return;
+    }
+
+    if (propertyName === `_name`) {
+      if (plugin.pluginSpec === undefined) {
+        plugin.pluginSpec = {};
+      }
+
+      plugin.pluginSpec.name = propertyValue;
+      this.room._pluginManager.pluginIds.set(propertyValue, plugin._id);
+
+      return;
+    }
   }
 
   /**
@@ -956,8 +1001,6 @@ class TrappedRoomManager {
    * Must be called by {@link PluginManager#removePlugin} to ensure overall
    * consistency.
    *
-   * TODO remove hooks for the plugin
-   *
    * @function TrappedRoomManager#removePluginHandlersAndProperties
    * @param {number} pluginId Plugin ID.
    */
@@ -965,6 +1008,14 @@ class TrappedRoomManager {
     if (!this.room._pluginManager.hasPlugin(pluginId)) {
       return;
     }
+
+    let clearPluginHooks = (handlers) => handlers.delete(pluginId);
+
+    // TODO solve cleaner, provide public API to remove hooks
+    this.preEventHandlerHooks.forEach(clearPluginHooks);
+    this.preEventHooks.forEach(clearPluginHooks);
+    this.postEventHandlerHooks.forEach(clearPluginHooks);
+    this.postEventHooks.forEach(clearPluginHooks);
 
     this.properties.delete(pluginId);
     this.handlers.delete(pluginId);

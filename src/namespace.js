@@ -117,15 +117,6 @@ module.exports.populate = () => {
     'LOCAL_EVENT': `localEvent`,
 
     /**
-     * Any other event that does not (yet) have an event type.
-     *
-     * @property {Array} eventArgs Arguments to the event, if any.
-     *
-     * @memberOf HHM.events
-     */
-    'OTHER': `other`,
-
-    /**
      * Triggered after a plugin was disabled.
      *
      * @property {HhmRoomObject} plugin The disabled plugin.
@@ -199,5 +190,22 @@ module.exports.populate = () => {
      * @memberOf HHM.events
      */
     'PROPERTY_UNSET': `propertyUnset`,
+
+    /**
+     * Triggered after all pre-user plugins, e.g. hhm/core and hhm/persistence,
+     * have been loaded, and before user plugins are loaded.
+     *
+     * @memberOf HHM.events
+     */
+    'PRE_USER_PLUGINS_LOADED': `preUserPluginsLoaded`,
+
+    /**
+     * Triggered after all user plugins, including _postInit, have been loaded.
+     *
+     * This event indicates that the HHM startup is complete.
+     *
+     * @memberOf HHM.events
+     */
+    'USER_PLUGINS_LOADED': `userPluginsLoaded`,
   }
 };
