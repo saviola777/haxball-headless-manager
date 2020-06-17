@@ -1,6 +1,3 @@
-const hashFunction = require(`../hash`);
-const hashSeed = 14868;
-
 /**
  * PluginLoader class, responsible for loading plugins via repositories or via
  * code.
@@ -48,15 +45,19 @@ class PluginLoader {
       pluginRoom._lifecycle.valid = false;
     }
 
-    if (typeof pluginName !== `undefined`
-        && pluginRoom.hasOwnProperty(`pluginSpec`)
-        && !pluginRoom.pluginSpec.hasOwnProperty(`name`)) {
-      pluginRoom._name = pluginName;
+    if (pluginRoom.hasOwnProperty(`pluginSpec`)) {
+      if (typeof pluginName !== `undefined`
+          && !pluginRoom.pluginSpec.hasOwnProperty(`name`)) {
+        pluginRoom._name = pluginName;
+      }
+
+      pluginRoom._configDefault = HHM.util.clone(pluginRoom.pluginSpec.config);
     }
 
     pluginRoom._source = typeof pluginCode === `function`
         ? pluginCode.toString() : pluginCode;
-    pluginRoom._sourceHash = hashFunction(pluginRoom._source, hashSeed);
+    pluginRoom._sourceHash = HHM.util.hashFunction(pluginRoom._source,
+        HHM.util.hashSeed);
 
     if (!this.pluginManager.hasPlugin(pluginRoom._id)) {
       HHM.log.error(

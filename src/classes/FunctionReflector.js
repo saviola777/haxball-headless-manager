@@ -1,5 +1,4 @@
 const functionReflector = require(`js-function-reflector`);
-const hashFunction = require(`../hash`);
 
 /**
  * Wrapper class around the js-function-reflector library.
@@ -34,7 +33,7 @@ class FunctionReflector {
    *  of this object.
    */
   forFunction(func, scope) {
-    const hash = hashFunction(
+    const hash = HHM.util.hashFunction(
         typeof func === `function` ? func.toString() : func, this.hashSeed);
 
     if (!this.functionMap.has(hash)) {

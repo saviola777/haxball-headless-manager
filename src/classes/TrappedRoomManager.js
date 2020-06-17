@@ -1,7 +1,5 @@
 const merge = require('lodash.merge');
 const toposort = require(`toposort`);
-const hashFunction = require(`../hash`);
-const hashSeed = 14868;
 const EventHandlerExecutionMetadata = require(`./EventHandlerExecutionMetadata`);
 
 /**

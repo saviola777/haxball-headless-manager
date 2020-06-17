@@ -44,12 +44,31 @@ module.exports.populate = () => {
   global.HHM.deferreds = {};
 
   /**
+   * Global utility functions.
+   */
+  global.HHM.util = {};
+
+  /**
    * Contains the hash function used within the HHM.
    *
-   * @member HHM.hashFunction
+   * @member HHM.util.hashFunction
    * @see external:murmurhash3_32_gc
    */
-  global.HHM.hashFunction = require(`./hash`);
+  HHM.util.hashFunction = require(`./hash`);
+
+  /**
+   * Hash seed used within the HHM.
+   */
+  HHM.util.hashSeed = 14868;
+
+  /**
+   * rfdc cloning function.
+   *
+   * Deep cloning of objects with circular reference support.
+   *
+   * @member HHM.util.clone
+   */
+  HHM.util.clone = require(`rfdc`)({ proto: true, circles: true });
 
   /**
    * Provides access to all classes of the HHM.

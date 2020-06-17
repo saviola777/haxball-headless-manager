@@ -414,9 +414,8 @@ module.exports.createRoom = function(room, pluginManager) {
      */
     log: function(message, level = HHM.log.level.INFO) {
       level = HHM.log.hasOwnProperty(level) ? level : HHM.log.level.INFO;
-      if (HHM.log.hasOwnProperty(level)) {
-        HHM.log[level](`[${this._name}] ` + message);
-      }
+
+      HHM.log[level](`[${this._name}] ` + message);
     },
 
     /**
