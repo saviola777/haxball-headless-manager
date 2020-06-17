@@ -934,12 +934,15 @@ class TrappedRoomManager {
     // Register plugin name after setting the plugin specification
     if (propertyName === `pluginSpec`) {
 
+      plugin._pluginSpecOriginal = HHM.util.clone(plugin.pluginSpec);
+
       // If pluginSpec is no object, use the value as plugin name
-      // TODO document behavior
+      // TODO throw error instead?
       if (typeof propertyValue !== `object`) {
         plugin.pluginSpec = { name: propertyValue };
         return;
       }
+
 
       if (propertyValue.hasOwnProperty(`name`)
           && propertyValue.name !== plugin._name) {

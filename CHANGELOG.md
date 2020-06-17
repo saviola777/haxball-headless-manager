@@ -1,5 +1,19 @@
 # Changelog
 
+## Version 1.0.1
+
+- plugins can now be loaded from specific repositories
+- plugins can now be added before starting the HHM, they will be loaded before
+  the user plugins during HMM start
+- some code was moved from hhm/core into the HHM, because it belonged there
+- add default repository names
+- when adding plugins, the plugin configuration can now be passed along, it
+  will override the default plugin config, but will still be overridden by the
+  user config
+- a backup of the original plugin specification is now created when a plugin is
+  loaded, it can be accessed via `plugin._pluginSpecOriginal`
+- fix minor bugs and refactoring
+
 ## Version 1.0.0
 
 - add support for object handlers

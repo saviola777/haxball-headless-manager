@@ -45,13 +45,12 @@ class PluginLoader {
       pluginRoom._lifecycle.valid = false;
     }
 
+    // TODO check if pluginSpec object or undefined, throw error otherwise
     if (pluginRoom.hasOwnProperty(`pluginSpec`)) {
       if (typeof pluginName !== `undefined`
           && !pluginRoom.pluginSpec.hasOwnProperty(`name`)) {
         pluginRoom._name = pluginName;
       }
-
-      pluginRoom._configDefault = HHM.util.clone(pluginRoom.pluginSpec.config);
     }
 
     pluginRoom._source = typeof pluginCode === `function`
