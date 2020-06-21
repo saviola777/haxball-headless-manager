@@ -634,7 +634,8 @@ class PluginManager {
 
     if (!this.hasPlugin(pluginId)) return true;
 
-    if (safe && (!this.canPluginBeDisabled(pluginId)
+    if (safe && this.isPluginEnabled(pluginId) &&
+        (!this.canPluginBeDisabled(pluginId)
         || !this.disablePlugin(pluginId, false).includes(pluginId))) {
       return false;
     }

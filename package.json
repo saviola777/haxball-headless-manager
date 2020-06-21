@@ -1,6 +1,6 @@
 {
   "name": "@saviola777/haxball-headless-manager",
-  "version": "1.0.1",
+  "version": "1.0.2-git",
   "description": "Plugin manager for headless HaxBall hosts.",
   "main": "index.js",
   "repository": {
