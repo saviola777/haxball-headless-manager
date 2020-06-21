@@ -634,9 +634,15 @@ class PluginManager {
 
     if (!this.hasPlugin(pluginId)) return true;
 
-    if (safe && (!this.canPluginBeDisabled(pluginId)
-        || !this.disablePlugin(pluginId, false).includes(pluginId))) {
-      return false;
+    if (safe && !this.isPluginEnabled(pluginId)) {
+      // Ensure plugin can be disabled.
+      if (!this.canPluginBeDisabled(pluginId)) {
+        return false;
+      }
+      // Disable plugin and ensure it got disabled.
+      if (!this.disablePlugin(pluginId, false).includes(pluginId)) {
+        return false;
+      }
     }
 
     const pluginRoom = this.plugins.get(pluginId);
