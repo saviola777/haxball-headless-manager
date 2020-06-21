@@ -1,5 +1,9 @@
 # Changelog
 
+## Version 1.0.2
+
+- fix an issue with plugin reloading
+
 ## Version 1.0.1
 
 - plugins can now be loaded from specific repositories
