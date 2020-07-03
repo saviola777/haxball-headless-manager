@@ -489,11 +489,14 @@ class TrappedRoomManager {
    * Returns an `Array` of all registered handler names.
    *
    * @function PluginManager#getHandlerNames
+   * @param {boolean} [excludeDisabled] Wether to exclude handlers for disabled
+   *  plugins.
    * @returns {Array.<string>} Registered handler names.
    */
-  getAllEventHandlerNames() {
-    return [...new Set(Array.from(this.handlers.keys())
-        .flatMap((pluginId) => Array.from(this.handlers.get(pluginId).keys())))];
+  getAllEventHandlerNames(excludeDisabled = true) {
+    return [...new Set(Array.from(this.handlers.keys()).flatMap((pluginId) =>
+        (!excludeDisabled || this.room.getPlugin(pluginId).isEnabled()) ?
+            Array.from(this.handlers.get(pluginId).keys()) : []))];
   }
 
   /**
@@ -529,13 +532,15 @@ class TrappedRoomManager {
    *
    * @function TrappedRoomManager#getEventHandlerObjects
    * @param {string} handlerName Event handler name.
+   * @param {boolean} excludeDisabled Whether to exclude handler objects for
+   *  disabled plugins.
    * @returns {Map.<number, object.<*>>} Event handler objects by plugin ID.
    */
-  getAllEventHandlerObjects(handlerName) {
+  getAllEventHandlerObjects(handlerName, excludeDisabled = true) {
     const eventHandlerObjects = new Map();
 
     Array.from(this.handlers.keys())
-        .filter((pluginId) => this.handlers.get(pluginId).has(handlerName))
+        .filter((pluginId) => (!excludeDisabled || this.room.getPlugin(pluginId).isEnabled()) && this.handlers.get(pluginId).has(handlerName))
         .forEach((pluginId) => eventHandlerObjects.set(pluginId,
           this.getEventHandlerObject(pluginId, handlerName)));
 

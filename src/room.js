@@ -149,6 +149,8 @@ module.exports.createRoom = function(room, pluginManager) {
         const previousFn = room[name];
         const definingPlugin = this;
 
+        // TODO change this into a linked list so functions from removed plugins
+        //  can be removed, they lead to leaks otherwise
         room[name] = function(...args) {
           if (definingPlugin.isEnabled()) {
             return element({
@@ -369,8 +371,8 @@ module.exports.createRoom = function(room, pluginManager) {
      * @memberOf HhmRoomObject
      * @returns {boolean} Whether a valid plugin with the given name exists.
      */
-    hasPlugin: function(pluginName) {
-      return pluginManager.hasPlugin(pluginName);
+    hasPlugin: function(pluginIdOrName) {
+      return pluginManager.hasPlugin(pluginIdOrName);
     },
 
     /**

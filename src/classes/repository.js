@@ -42,7 +42,7 @@ class Repository {
     this._validateConfiguration();
 
     // TODO Turn into map
-    this.pluginSources = {};
+    this.pluginSources = new Map();
 
     this.initializationDeferred = new $.Deferred();
     this.handler.getRepositoryInformation(this)
@@ -208,13 +208,13 @@ class Repository {
    * @see repository.RepositoryTypeHandler.getPluginSource
    */
   async getPluginSource(pluginName) {
-    if (this.pluginSources[pluginName] === undefined) {
-      this.pluginSources[pluginName] =
+    if (!this.pluginSources.has(pluginName)) {
+      this.pluginSources.set(pluginName,
           await this._postProcessPluginResult(
-          await this.handler.getPluginSource(this, pluginName));
+          await this.handler.getPluginSource(this, pluginName)));
     }
 
-    return this.pluginSources[pluginName];
+    return this.pluginSources.get(pluginName);
   }
 
   /**
@@ -292,11 +292,9 @@ class Repository {
  */
 class RepositoryFactory {
   constructor(repositoryTypeHandlers = {}) {
-    // TODO document
-    // TODO turn into maps
-    this.repositories = {};
-    this.userRepositoryConfigs = {};
-    this.repositoryTypeHandlers = {};
+    this.repositories = new Map();
+    this.userRepositoryConfigs = new Map();
+    this.repositoryTypeHandlers = new Map();
 
     Object.getOwnPropertyNames(repositoryTypeHandlers).forEach((type) => {
       try {
@@ -318,13 +316,12 @@ class RepositoryFactory {
    * @throws {repository.RepositoryTypeError} If no type was found.
    */
   addRepositoryTypeHandler(handler, type = handler.type) {
-
     if (type === undefined) {
       throw new RepositoryTypeError(undefined);
     }
 
     // TODO warning if replace?
-    this.repositoryTypeHandlers[type] = $.extend(handler, { type });
+    this.repositoryTypeHandlers.set(type, $.extend(handler, { type }));
   }
 
   /**
@@ -341,37 +338,36 @@ class RepositoryFactory {
    */
   async createRepository(userRepositoryConfig) {
 
-    if (this.repositoryTypeHandlers[userRepositoryConfig.type]
-        === undefined) {
-
+    if (!this.repositoryTypeHandlers.has(userRepositoryConfig.type)) {
       throw new RepositoryTypeError(userRepositoryConfig.type);
     }
 
     // Check if user repository Config is known
     const userRepositoryConfigHash = hash(stringify(userRepositoryConfig), seed);
 
-    if (this.userRepositoryConfigs[userRepositoryConfigHash] !== undefined) {
-      return this.repositories[this.userRepositoryConfigs[userRepositoryConfigHash]];
+    if (this.userRepositoryConfigs.has(userRepositoryConfigHash)) {
+      return this.repositories.get(
+          this.userRepositoryConfigs.get(userRepositoryConfigHash));
     }
 
     // Create repo from config, then compare resulting config with cache
     const repository = new Repository(userRepositoryConfig,
-        this.repositoryTypeHandlers[userRepositoryConfig.type]);
+        this.repositoryTypeHandlers.get(userRepositoryConfig.type));
 
     await repository.awaitInitialization();
 
     const repositoryConfigHash = repository.getConfigurationHash();
 
-    this.userRepositoryConfigs[userRepositoryConfigHash] = repositoryConfigHash;
+    this.userRepositoryConfigs.set(userRepositoryConfigHash, repositoryConfigHash);
 
     // Save repository
-    if (this.repositories[repositoryConfigHash] === undefined) {
-      this.repositories[repositoryConfigHash] = repository;
+    if (!this.repositories.has(repositoryConfigHash)) {
+      this.repositories.set(repositoryConfigHash, repository);
     }
 
-    // Check cache and return cached repo, or create new repo from config
-    // merge config with default values?
-    return this.repositories[repositoryConfigHash];
+    // TODO Check cache and return cached repo, or create new repo from config,
+    //  merge config with default values?
+    return this.repositories.get(repositoryConfigHash);
   }
 }
 

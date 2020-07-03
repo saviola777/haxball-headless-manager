@@ -654,6 +654,8 @@ class PluginManager {
       plugin: pluginRoom,
     });
 
+    pluginRoom._lifecycle.loaded = false;
+
     return true;
   }
 
@@ -813,8 +815,8 @@ class PluginManager {
    * @see TrappedRoomManager#getAllEventHandlerNames
    * @returns {Array.<string>} Registered handler names.
    */
-  getHandlerNames() {
-    return this.room._trappedRoomManager.getAllEventHandlerNames();
+  getHandlerNames(excludeDisabled = true) {
+    return this.room._trappedRoomManager.getAllEventHandlerNames(excludeDisabled);
   }
 
   /**
