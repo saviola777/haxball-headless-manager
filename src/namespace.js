@@ -178,7 +178,7 @@ module.exports.populate = () => {
     'PLUGIN_LOADED': `pluginLoaded`,
 
     /**
-     * Triggered after a plugin was removed.
+     * Triggered before a plugin is removed.
      *
      * @property {HhmRoomObject} plugin The removed plugin.
      *

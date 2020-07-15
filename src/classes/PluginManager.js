@@ -100,7 +100,7 @@ class PluginManager {
 
     if (pluginName !== undefined && this.hasPlugin(pluginName)) {
       // Avoid loading plugins twice
-        return loadStack || this.getPluginId(pluginName);
+      return loadStack || this.getPluginId(pluginName);
     }
 
     const pluginId = await this.pluginLoader.tryToLoadPlugin(
@@ -621,7 +621,7 @@ class PluginManager {
    * fail if (other) plugins depend on it.
    *
    * @function PluginManager#removePlugin
-   * @param {number} pluginId ID of the plugin to be removed.
+   * @param {(number|string)} pluginIdOrName ID or name of the plugin to be removed.
    * @param {boolean} safe Whether the removal should be done safely, i.e. by
    *  first disabling the relevant plugin and making sure no other enabled
    *  plugins depend on it.
@@ -630,7 +630,9 @@ class PluginManager {
    *  plugins depend on it). Removal is considered successful if the plugin
    *  with the given ID does not exist.
    */
-  removePlugin(pluginId, safe = true) {
+  removePlugin(pluginIdOrName, safe = true) {
+    const { pluginId, pluginName } =
+        this._extractPluginNameAndId(pluginIdOrName);
 
     if (!this.hasPlugin(pluginId)) return true;
 
@@ -642,19 +644,15 @@ class PluginManager {
 
     const pluginRoom = this.plugins.get(pluginId);
 
-    this.plugins.delete(pluginRoom._id);
-    this.pluginIds.delete(pluginRoom._name);
-    this.pluginsDisabled.splice(
-        this.pluginsDisabled.indexOf(pluginId), 1);
-    this.room._trappedRoomManager.removePluginHandlersAndProperties(pluginId);
-
-    this.room._trappedRoomManager.handlersDirty = true;
-
     this.triggerHhmEvent(HHM.events.PLUGIN_REMOVED, {
       plugin: pluginRoom,
     });
 
-    pluginRoom._lifecycle.loaded = false;
+    this.room._trappedRoomManager.removePluginHandlersAndProperties(pluginId);
+
+    this.plugins.delete(pluginId);
+    this.pluginIds.delete(pluginName);
+    this.pluginsDisabled.splice(this.pluginsDisabled.indexOf(pluginId), 1);
 
     return true;
   }
@@ -865,6 +863,7 @@ class PluginManager {
       pluginRoom._lifecycle = { valid: false, loaded: false };
 
       if (pluginName !== undefined) {
+        this._registerPluginName(id, pluginName);
         this.pluginIds.set(pluginName, id);
         pluginRoom._name = pluginName;
       }
@@ -881,15 +880,15 @@ class PluginManager {
    * @TODO convert boolean parameters to destructuring
    *
    * @function PluginManager.getPluginDependencies
-   * @param {number} pluginId Dependencies of this plugin are returned.
+   * @param {(number|string)} pluginIdOrName Dependencies of this plugin are returned.
    * @param {boolean} [recursive] Whether to return dependencies recursively,
    *  or only direct dependencies
    * @param {boolean} [ids] Whether to return IDs instead of names.
    * @returns {Array.<string>} Plugin names or IDs of dependencies of the given
    *  plugin.
    */
-  getPluginDependencies(pluginId, recursive = false, ids = false) {
-    const plugin = this.getPlugin(pluginId);
+  getPluginDependencies(pluginIdOrName, recursive = false, ids = false) {
+    const plugin = this.getPlugin(pluginIdOrName);
 
     if ((plugin.getPluginSpec().dependencies || []).length === 0) {
       return [];
@@ -957,6 +956,44 @@ class PluginManager {
    */
   getPluginRepositoryFactory() {
     return this.repositoryFactory;
+  }
+
+  /**
+   * Returns the plugin specification for the given plugin.
+   *
+   * If the plugin is not currently loaded, it wil be loaded and then
+   * immediately removed after getting its plugin specification.
+   *
+   * If loading the plugin fails, undefined will be returned.
+   *
+   * @TODO make this more general by returning the whole plugin?
+   *
+   * @function PluginManager#getPluginSpec
+   * @returns {(object|undefined|boolean)} Plugin specification or false if
+   *  the plugin could not be found. Undefined if the plugin does not provide
+   *  a plugin specification.
+   */
+  async getPluginSpec(pluginIdOrName) {
+    const { pluginName } =
+        this._extractPluginNameAndId(pluginIdOrName);
+
+    if (this.hasPlugin(pluginName)) {
+      return this.getPlugin(pluginName).pluginSpec;
+    }
+
+    let pluginId = await this.pluginLoader.tryToLoadPlugin({ pluginName });
+
+    if (pluginId === -1) {
+      return false;
+    }
+
+    let pluginSpec = this.getPlugin(pluginId).pluginSpec;
+
+    if (!this.removePlugin(pluginId)) {
+      HHM.log.error(`Unable to remove plugin ${pluginName} after getting its pluginSpec`);
+    }
+
+    return pluginSpec;
   }
 
   /**
@@ -1052,6 +1089,24 @@ class PluginManager {
     }
 
     return require(`../room`).createRoom(room, this);
+  }
+
+  /**
+   * Called when a plugin name is set or changed.
+   *
+   * This function makes sure there is only one name -> ID mapping for each
+   * plugin.
+   */
+  _registerPluginName(pluginId, pluginName) {
+    // Remove old name -> ID mapping
+    this.pluginIds.forEach((id, name, pluginIds) => {
+      if (id === pluginId) {
+        pluginIds.delete(name);
+      }
+    });
+
+    // Add new mapping
+    this.pluginIds.set(pluginName, pluginId);
   }
 
   /**

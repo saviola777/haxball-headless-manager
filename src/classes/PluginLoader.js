@@ -47,9 +47,15 @@ class PluginLoader {
 
     // TODO check if pluginSpec object or undefined, throw error otherwise
     if (pluginRoom.hasOwnProperty(`pluginSpec`)) {
-      if (typeof pluginName !== `undefined`
-          && !pluginRoom.pluginSpec.hasOwnProperty(`name`)) {
+      if (typeof pluginName !== `undefined`) {
         pluginRoom._name = pluginName;
+
+        if (pluginRoom.pluginSpec.hasOwnProperty(`name`) &&
+            pluginRoom.pluginSpec.name !== pluginName) {
+          HHM.log.error(`Invalid plugin specification: name is ` +
+              `${pluginRoom.pluginSpec.name} but was loaded as ${pluginName}`);
+          pluginRoom._lifecycle.valid = false;
+        }
       }
     }
 
@@ -162,9 +168,6 @@ class PluginLoader {
   /**
    * Tries to load a plugin from name, code, or URL.
    *
-   * Convenience function which calls one of the other `tryToLoadPlugin`
-   * functions.
-   *
    * @function PluginLoader#tryToLoadPlugin
    * @async
    * @param {string} [pluginName] Plugin name.
@@ -173,8 +176,7 @@ class PluginLoader {
    * @returns {Promise.<number>} the ID of the plugin or -1 if it couldn't be
    *  #loaded.
    */
-  async tryToLoadPlugin({ pluginName, pluginCode,
-                          pluginConfig } = {}) {
+  async tryToLoadPlugin({ pluginName, pluginCode, pluginConfig } = {}) {
     let pluginId = -1;
 
     if (pluginCode !== undefined) {

@@ -255,7 +255,8 @@ class TrappedRoomManager {
   }
 
   /**
-   * TODO documentation
+   * Executes the given handler function belonging to the given handler object
+   * using the given metadata.
    *
    * @param {Function} handlerFunction The handler function.
    * @param {object.<*>} handlerObject Handler object.
@@ -286,6 +287,9 @@ class TrappedRoomManager {
     }
   }
 
+  /**
+   * Executes handler hooks.
+   */
   _executeHooks(hooks, handlerName, metadata) {
     if (!hooks.has(handlerName)) {
       return;
@@ -294,7 +298,7 @@ class TrappedRoomManager {
     for (const [pluginId, pluginHandlerHooks] of
         hooks.get(handlerName).entries()) {
 
-      if (!this._isPluginEnabledAndLoaded(pluginId)) {
+      if (!this.room.getPluginManager().isPluginEnabled(pluginId)) {
         continue;
       }
 
@@ -320,23 +324,11 @@ class TrappedRoomManager {
     }
   }
 
+  /**
+   * Executes onGameTick handlers without overhead.
+   */
   _executeOnGameTickHandlers() {
     this.onGameTickHandlers.forEach((handlerFunction) => handlerFunction());
-  }
-
-  /**
-   * Returns whether the plugin with the given ID is both enabled and loaded.
-   *
-   * @function TrappedRoomManager#_isPluginEnabledAndLoaded
-   * @private
-   * @param {number} pluginId Plugin ID.
-   * @returns {boolean} Whether the plugin is enabled.
-   *
-   * TODO remove
-   */
-  _isPluginEnabledAndLoaded(pluginId) {
-    return this.room.getPluginManager().hasPlugin(pluginId)
-      && this.room.getPluginManager().getPlugin(pluginId).isEnabled();
   }
 
   /**
@@ -392,6 +384,14 @@ class TrappedRoomManager {
     }
   }
 
+  /**
+   * Updates the onGameTick handlers.
+   *
+   * This is called in onExecuteEventHandlers whenever the handlers have been
+   * changed, since the onGameTick event is treated differently than all other
+   * events – they are executed on a "fast lane" with minimal overhead to avoid
+   * slowing down room script execution.
+   */
   _updateOnGameTickHandlers() {
     this.onGameTickHandlers.clear();
 
@@ -489,7 +489,7 @@ class TrappedRoomManager {
    * Returns an `Array` of all registered handler names.
    *
    * @function PluginManager#getHandlerNames
-   * @param {boolean} [excludeDisabled] Wether to exclude handlers for disabled
+   * @param {boolean} [excludeDisabled] Whether to exclude handlers for disabled
    *  plugins.
    * @returns {Array.<string>} Registered handler names.
    */
@@ -540,7 +540,8 @@ class TrappedRoomManager {
     const eventHandlerObjects = new Map();
 
     Array.from(this.handlers.keys())
-        .filter((pluginId) => (!excludeDisabled || this.room.getPlugin(pluginId).isEnabled()) && this.handlers.get(pluginId).has(handlerName))
+        .filter((pluginId) => (!excludeDisabled || this.room.getPlugin(pluginId).isEnabled())
+          && this.handlers.get(pluginId).has(handlerName))
         .forEach((pluginId) => eventHandlerObjects.set(pluginId,
           this.getEventHandlerObject(pluginId, handlerName)));
 
@@ -644,8 +645,8 @@ class TrappedRoomManager {
   }
 
   /**
-   * Registers the given handler function for the given handler name and plugin
-   * ID.
+   * Registers the given handler function or object for the given handler name
+   * and plugin ID.
    *
    * @TODO handle onGameTick differently
    *
@@ -801,8 +802,6 @@ class TrappedRoomManager {
   /**
    * Executes the event handlers registered for the given handler.
    *
-   * @TODO handle onGameTick differently
-   *
    * @function TrappedRoomManager#onExecuteEventHandlers
    * @param {*} _ Unused.
    * @param {string} handlerName Event handler name.
@@ -841,7 +840,7 @@ class TrappedRoomManager {
       for (let pluginId of this.handlerExecutionOrders.get(handlerName)) {
 
         // Skip disabled plugins
-        if (!this._isPluginEnabledAndLoaded(pluginId)) {
+        if (!this.room.getPluginManager().isPluginEnabled(pluginId)) {
           continue;
         }
 
@@ -969,7 +968,7 @@ class TrappedRoomManager {
       }
 
       plugin.pluginSpec.name = propertyValue;
-      this.room._pluginManager.pluginIds.set(propertyValue, plugin._id);
+      this.room._pluginManager._registerPluginName(plugin._id, propertyValue);
 
       return;
     }
