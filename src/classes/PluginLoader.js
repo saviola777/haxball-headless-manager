@@ -34,11 +34,17 @@ class PluginLoader {
       return pluginRoom;
     };
 
+    // For scripts that use window.HBInit
+    const windowCopy = {
+      ...window,
+      HBInit
+    }
+
     try {
       if (typeof pluginCode === `function`) {
-        pluginCode(HBInit);
+        pluginCode(HBInit, windowCopy);
       } else {
-        Function.apply(null, [`HBInit`, pluginCode])(HBInit);
+        Function.apply(null, [`HBInit`, `window`, pluginCode])(HBInit, windowCopy);
       }
     } catch (e) {
       HHM.log.error(`Unable to execute plugin. ${e.name}: ${e.message}`);

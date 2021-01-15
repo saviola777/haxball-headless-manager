@@ -1,6 +1,6 @@
 {
   "name": "@saviola777/haxball-headless-manager",
-  "version": "1.0.3-git",
+  "version": "1.0.3",
   "description": "Plugin manager for headless HaxBall hosts.",
   "main": "index.js",
   "repository": {
@@ -36,6 +36,6 @@
     "browserify": "^16.5.1",
     "foodoc": "^0.0.9",
     "jsdoc": "^3.6.4",
-    "surge": "^0.21.3"
+    "surge": "^0.21.6"
   }
 }

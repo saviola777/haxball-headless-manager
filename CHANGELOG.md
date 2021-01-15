@@ -1,5 +1,17 @@
 # Changelog
 
+## Version 1.0.3
+
+- improved plugin lifecycle: removed plugins properly marked as not loaded
+- exclude handlers for disabled plugins when returning collections of handlers
+  by default
+- loading a plugin by a different name than specified in its pluginSpec
+  is no longer allowed (#25)
+- plugin specifications of plugins can now be loaded without adding the
+  plugin into the room, using HHM.manager.getPluginSpecification (#22)
+- fix problem with removing plugins from the room where handlers and
+  properties were not properly deleted
+
 ## Version 1.0.2
 
 - fix an issue with plugin reloading

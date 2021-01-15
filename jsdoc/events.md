@@ -133,7 +133,7 @@ They have a less important role than pre-event hooks in that they are
 essentially handlers which are executed after the main event handler execution
 loop finishes. They are always executed regardless of event state validation. If
 you want to make sure your handler is executed but do not need it to be executed
-before the event handler execution loop, register it as a post-event handler hook.
+before the event handler execution loop, register it as a post-event hook.
 
 If you want to check if any handlers were executed to decide if you hook needs
 to be run, check `metadata.getHandlers().size`.
