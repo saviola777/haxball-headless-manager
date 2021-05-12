@@ -1,3 +1,5 @@
+const LocalStorageProxy = require(`./LocalStorageProxy`);
+
 /**
  * PluginLoader class, responsible for loading plugins via repositories or via
  * code.
@@ -25,7 +27,7 @@ class PluginLoader {
    *  or a string.
    * @param {external:haxball-room-trapper.TrappedRoom} pluginRoom Trapped room
    *  for the plugin.
-   * @param {string} [pluginName] Default plugin name, will be overwritten by
+   * @param {string} [pluginName] Default plugin name, should be the same as
    *  the name property of the `pluginSpec` if given.
    */
   _executePlugin(pluginCode, pluginRoom, pluginName) {
@@ -34,17 +36,23 @@ class PluginLoader {
       return pluginRoom;
     };
 
+    const source = typeof pluginCode === `function`
+        ? pluginCode.toString() : pluginCode;
+    const sourceHash = HHM.util.hashFunction(source, HHM.util.hashSeed);
+
     // For scripts that use window.HBInit
     const windowCopy = {
       ...window,
-      HBInit
+      HBInit,
+      localStorage: new LocalStorageProxy(pluginName ? pluginName : sourceHash),
     }
 
     try {
       if (typeof pluginCode === `function`) {
         pluginCode(HBInit, windowCopy);
       } else {
-        Function.apply(null, [`HBInit`, `window`, pluginCode])(HBInit, windowCopy);
+        Function.apply(null, [`HBInit`, `localStorage`, `window`, pluginCode])(HBInit,
+            windowCopy.localStorage, windowCopy);
       }
     } catch (e) {
       HHM.log.error(`Unable to execute plugin. ${e.name}: ${e.message}`);
@@ -65,10 +73,8 @@ class PluginLoader {
       }
     }
 
-    pluginRoom._source = typeof pluginCode === `function`
-        ? pluginCode.toString() : pluginCode;
-    pluginRoom._sourceHash = HHM.util.hashFunction(pluginRoom._source,
-        HHM.util.hashSeed);
+    pluginRoom._source = source;
+    pluginRoom._sourceHash = sourceHash;
 
     if (!this.pluginManager.hasPlugin(pluginRoom._id)) {
       HHM.log.error(
@@ -207,8 +213,7 @@ class PluginLoader {
    * @function PluginLoader#_tryToLoadPluginByCode
    * @private
    * @param {(string|Function)} pluginCode Plugin code as `string` or `Function`.
-   * @param {string} [pluginName] Optional default plugin name, used only if the
-   *  plugin code does not set a name.
+   * @param {string} [pluginName] Optional plugin name.
    * @param {object} [pluginConfig] Plugin configuration.
    * @returns {number} the ID of the plugin or -1 if it couldn't be loaded.
    * @see PluginLoader#_executePlugin
@@ -216,7 +221,7 @@ class PluginLoader {
   _tryToLoadPluginByCode(pluginCode, pluginName,
                          pluginConfig = {}) {
     const pluginRoom = this.pluginManager.getPlugin(pluginName, true);
-    this._executePlugin(pluginCode, pluginRoom);
+    this._executePlugin(pluginCode, pluginRoom, pluginName);
 
     pluginRoom._loadedFrom = { getName: () => `code`};
 

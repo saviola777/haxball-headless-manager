@@ -1,4 +1,4 @@
-const $ = require(`jquery-browserify`);
+const $ = require(`jquery`);
 const EventHandlerExecutionMetadata = require(`./EventHandlerExecutionMetadata`);
 const PluginLoader = require(`./PluginLoader`);
 const TrappedRoomManager = require(`./TrappedRoomManager`);
@@ -74,13 +74,13 @@ class PluginManager {
    *
    * @function PluginManager#addPlugin
    * @async
-   * @param {Object} [pluginInfo] Plugin information like name, url, or code.
+   * @param {object} [pluginInfo] Plugin information like name, url, or code.
    *  At least one of URL, code or name has to be given
    * @param {string} [pluginName] Name of the plugin, set to `undefined` if
    *  you want to load a plugin by code.
    * @param {(Function|string)} [pluginCode] Plugin code as `Function` or
    *  `string`.
-   * @param {Object} [pluginConfig] Optional plugin configuration, user config
+   * @param {object} [pluginConfig] Optional plugin configuration, user config
    *  takes precedence.
    * @param {Array.<(number|boolean)>} [loadStack] `Array` of loaded plugin IDs
    *  in load order. Used internally during recursion.
@@ -520,7 +520,7 @@ class PluginManager {
    * @function PluginManager#_mergeConfig
    * @private
    * @param {string} pluginName Name of the plugin.
-   * @param {Object.<string, *>} configs Plugin configurations to be merged in.
+   * @param {object.<string, *>} configs Plugin configurations to be merged in.
    */
   _mergeConfig(pluginName, ...configs) {
     if (!this.hasPlugin(pluginName) || configs.length === 0) {

@@ -1,7 +1,7 @@
 "use strict";
 
 global.$ = global.jQuery =
-    typeof $ === `undefined` ? require(`jquery-browserify`) : $;
+    typeof $ === `undefined` ? require(`jquery`) : $;
 
 require(`./src/namespace`).populate();
 

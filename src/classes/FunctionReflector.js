@@ -24,11 +24,11 @@ class FunctionReflector {
    *
    * @function FunctionReflector#forFunction
    * @param {(Function|string)} func Function to be parsed.
-   * @param {Object.<string, *>} [scope] A scope in which to parse the function.
+   * @param {object.<string, *>} [scope] A scope in which to parse the function.
    *  Currently not fully supported, since the parsed result is stored using the
    *  hash of the function regardless of the scope -- it works if you make sure
    *  to pass the correct scope the first time and if the scope never changes.
-   * @returns {Object.<string, *>} The parsed function, see the
+   * @returns {object.<string, *>} The parsed function, see the
    *  js-function-reflector documentation for more information on the structure
    *  of this object.
    */
